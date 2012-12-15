@@ -57,6 +57,9 @@ import Data.Text.Encoding
 
 data SMTPConnection = SMTPC !Handle ![ByteString]
 
+instance Eq SMTPConnection where
+    (==) (SMTPC a _) (SMTPC b _) = a == b
+
 data Command = HELO ByteString
              | EHLO ByteString
              | MAIL ByteString
