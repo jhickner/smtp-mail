@@ -7,6 +7,7 @@ module Network.Mail.SMTP
     -- * Types
     , Command(..)
     , Response(..)
+    , ReplyCode
     , SMTPConnection
       -- * Auth Types (reexports)
     , UserName
