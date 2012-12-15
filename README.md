@@ -17,7 +17,9 @@ main = sendMail host port $ simpleMail from [to] subject body (Just html)
 
 or, with authentication:
 
-```sendMailWithLogin host port user pass $ ...```
+```haskell
+main = sendMailWithLogin host port user pass $ simpleMail from [to] subject body (Just html)
+```
 
 For more complicated scenarios or for adding attachments you can import
 ```Network.Mail.Mime``` and construct ```Mail``` objects manually.
