@@ -1,13 +1,21 @@
-module Network.Mail.SMTP.Auth
-where
+module Network.Mail.SMTP.Auth (
+    UserName,
+    Password,
+    AuthType(..),
+    login,
+    auth,
+) where
 
-import Data.Digest.MD5
-import Codec.Utils
-import qualified Codec.Binary.Base64.String as B64 (encode, decode)
+import Crypto.Hash.MD5 (hash)
+import qualified Data.ByteString.Base16 as B16  (encode)
+import qualified Data.ByteString.Base64 as B64  (encode)
 
+import Data.ByteString  (ByteString)
 import Data.List
 import Data.Bits
-import Data.Array
+import Data.Monoid
+import qualified Data.ByteString       as B
+import qualified Data.ByteString.Char8 as B8    (unwords)
 
 type UserName = String
 type Password = String
@@ -24,39 +32,37 @@ instance Show AuthType where
               showMain LOGIN    = "LOGIN"
               showMain CRAM_MD5 = "CRAM-MD5"
 
-b64Encode :: String -> String
-b64Encode = map (toEnum.fromEnum) . B64.encode . map (toEnum.fromEnum)
+toAscii :: String -> ByteString
+toAscii = B.pack . map (toEnum.fromEnum)
 
-b64Decode :: String -> String
-b64Decode = map (toEnum.fromEnum) . B64.decode . map (toEnum.fromEnum)
+b64Encode :: String -> ByteString
+b64Encode = B64.encode . toAscii
 
-showOctet :: [Octet] -> String
-showOctet = concatMap hexChars
-    where hexChars c = [arr ! (c `div` 16), arr ! (c `mod` 16)]
-          arr = listArray (0, 15) "0123456789abcdef"
+hmacMD5 :: ByteString -> ByteString -> ByteString
+hmacMD5 text key = hash (okey <> hash (ikey <> text))
+    where key' = if B.length key > 64
+                 then hash key <> B.replicate 48 0
+                 else key <> B.replicate (64-B.length key) 0
+          ipad = B.replicate 64 0x36
+          opad = B.replicate 64 0x5c
+          ikey = B.pack $ B.zipWith xor key' ipad
+          okey = B.pack $ B.zipWith xor key' opad
 
-hmacMD5 :: String -> String -> [Octet]
-hmacMD5 text key = hash $ okey ++ hash (ikey ++ map (toEnum.fromEnum) text)
-    where koc = map (toEnum.fromEnum) key
-          key' = if length koc > 64
-                 then hash koc ++ replicate 48 0
-                 else koc ++ replicate (64-length koc) 0
-          ipad = replicate 64 0x36
-          opad = replicate 64 0x5c
-          ikey = zipWith xor key' ipad
-          okey = zipWith xor key' opad
-
-plain :: UserName -> Password -> String
+plain :: UserName -> Password -> ByteString
 plain user pass = b64Encode $ intercalate "\0" [user, user, pass]
 
-login :: UserName -> Password -> (String, String)
+login :: UserName -> Password -> (ByteString, ByteString)
 login user pass = (b64Encode user, b64Encode pass)
 
-cramMD5 :: String -> UserName -> Password -> String
+cramMD5 :: String -> UserName -> Password -> ByteString
 cramMD5 challenge user pass =
-    b64Encode (user ++ " " ++ showOctet (hmacMD5 challenge pass))
+    B64.encode $ B8.unwords [user', B16.encode (hmacMD5 challenge' pass')]
+  where
+    challenge' = toAscii challenge
+    user'      = toAscii user
+    pass'      = toAscii pass
 
-auth :: AuthType -> String -> UserName -> Password -> String
+auth :: AuthType -> String -> UserName -> Password -> ByteString
 auth PLAIN    _ u p = plain u p
-auth LOGIN    _ u p = let (u', p') = login u p in unwords [u', p']
+auth LOGIN    _ u p = let (u', p') = login u p in B8.unwords [u', p']
 auth CRAM_MD5 c u p = cramMD5 c u p
