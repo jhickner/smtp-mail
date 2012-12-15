@@ -9,18 +9,22 @@ Making it easy to send SMTP emails from Haskell.
 import Network.Mail.SMTP
 
 from    = Address Nothing "email@domain.com"
-to      = Address (Just "Jason Hickner") "email@domain.com"
+to      = [Address (Just "Jason Hickner") "email@domain.com"]
+cc      = []
+bcc     = []
 subject = "email subject"
 body    = "email body"
-html    = "<h1>HTML</h1>" -- optional html body
+html    = Just "<h1>HTML</h1>" -- optional html body
 
-main = sendMail host port $ simpleMail from [to] subject body (Just html)
+mail = simpleMail from to cc bcc subject body html
+
+main = sendMail host port mail
 ```
 
 or, with authentication:
 
 ```haskell
-main = sendMailWithLogin host port user pass $ simpleMail from [to] subject body (Just html)
+main = sendMailWithLogin host port user pass mail
 ```
 
 ### Sending with sendmail
@@ -30,10 +34,10 @@ is reexported as well:
 
 ```haskell
 -- send via the default sendmail executable with default options
-renderSendMail $ simpleMail from [to] subject body (Just html)
+renderSendMail mail
 
 -- send via the specified executable with specified options
-renderSendMailCustom filepath [opts] $ simpleMail from [to] subject body (Just html)
+renderSendMailCustom filepath [opts] mail
 ```
 
 For more complicated scenarios or for adding attachments or CC/BCC

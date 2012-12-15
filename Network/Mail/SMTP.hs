@@ -238,15 +238,17 @@ sendMailWithLogin host port user pass mail = do
 -- an optional HTML body.
 simpleMail :: Address   -- ^ from
            -> [Address] -- ^ to
+           -> [Address] -- ^ CC
+           -> [Address] -- ^ BCC
            -> T.Text -- ^ subject
            -> TL.Text -- ^ plain body
            -> Maybe TL.Text -- ^ optional HTML body
            -> Mail
-simpleMail from to subject plainBody htmlBody =
+simpleMail from to cc bcc subject plainBody htmlBody =
     Mail { mailFrom = from
          , mailTo   = to
-         , mailCc   = []
-         , mailBcc  = []
+         , mailCc   = cc
+         , mailBcc  = bcc
          , mailHeaders = [ ("Subject", subject) ]
          , mailParts =   [ parts plainBody htmlBody ]
          }
