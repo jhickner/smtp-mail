@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                smtp-mail
-version:             0.1.0.0
+version:             0.1.1.0
 synopsis:            Simple email sending via SMTP
 -- description:         
 homepage:            http://github.com/jhickner/smtp-mail
@@ -14,6 +14,10 @@ maintainer:          jhickner@gmail.com
 category:            Network
 build-type:          Simple
 cabal-version:       >=1.8
+
+source-repository head
+  type: git
+  location: git@github.com:jhickner/smtp-mail.git
 
 library
   exposed-modules:     Network.Mail.SMTP, Network.Mail.SMTP.Auth
