@@ -21,8 +21,8 @@ or, with authentication:
 main = sendMailWithLogin host port user pass $ simpleMail from [to] subject body (Just html)
 ```
 
-If you'd like to use sendmail, ```Network.Mail.Mime```s sendmail interface is
-reexported as well:
+If you'd like to use sendmail, the sendmail interface from ```Network.Mail.Mime``` 
+is reexported as well:
 
 ```haskell
 -- send via the default sendmail executable with default options
