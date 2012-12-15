@@ -3,6 +3,8 @@ SMTP-MAIL
 
 Making it easy to send SMTP emails from Haskell.
 
+### Sending with an SMTP server
+
 ```haskell
 import Network.Mail.SMTP
 
@@ -20,6 +22,8 @@ or, with authentication:
 ```haskell
 main = sendMailWithLogin host port user pass $ simpleMail from [to] subject body (Just html)
 ```
+
+### Sending with sendmail
 
 If you'd like to use sendmail, the sendmail interface from ```Network.Mail.Mime``` 
 is reexported as well:
