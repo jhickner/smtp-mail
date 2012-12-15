@@ -111,15 +111,17 @@ tryOnce = tryCommand 1
 -- | Repeatedly attempt to send a 'Command' to the SMTP server
 tryCommand :: Int -> SMTPConnection -> Command -> ReplyCode
            -> IO ByteString
-tryCommand tries st cmd expectedReply | tries <= 0 = do
-  closeSMTP st
-  fail $ "cannot execute command " ++ show cmd ++
-           ", expected reply code " ++ show expectedReply
 tryCommand tries st cmd expectedReply = do
-  (code, msg) <- sendCommand st cmd
-  if code == expectedReply then
-      return msg else
-      tryCommand (tries - 1) st cmd expectedReply
+    (code, msg) <- sendCommand st cmd
+    if code == expectedReply 
+      then return msg
+      else if tries > 1
+        then tryCommand (tries - 1) st cmd expectedReply
+        else do
+          closeSMTP st
+          fail $ "Unexpected reply to: " ++ show cmd ++ 
+            ", Expected reply code: " ++ show expectedReply ++
+            ", Got this instead: " ++ show code ++ " " ++ show msg
 
 -- | Create an 'SMTPConnection' from an already connected Handle
 connectStream :: Handle -> IO SMTPConnection
