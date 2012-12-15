@@ -7,25 +7,21 @@ module Network.Mail.SMTP
     , plainTextPart
     , htmlPart
     , filePart
+
     -- * Types
-    , Command(..)
-    , Response(..)
-    , ReplyCode
+    , module Network.Mail.SMTP.Types
     , SMTPConnection
-      -- * Auth Types (reexports)
-    , UserName
-    , Password
-    , AuthType(..)
-      -- * Network.Mail.Mime types (reexports)
-    , Address (..)
+
       -- * Network.Mail.Mime's sendmail interface (reexports)
     , sendmail
     , sendmailCustom
     , renderSendMail
     , renderSendMailCustom
+
       -- * Establishing Connection
     , connectSMTPPort
     , connectSMTP
+
       -- * Operation to a Connection
     , sendCommand
     , login
@@ -33,6 +29,9 @@ module Network.Mail.SMTP
     , renderAndSend
     )
     where
+
+import Network.Mail.SMTP.Auth
+import Network.Mail.SMTP.Types
 
 import System.IO
 import System.FilePath (takeFileName)
@@ -43,7 +42,6 @@ import Data.Char (isDigit)
 
 import Network
 import Network.BSD (getHostName)
-import Network.Mail.SMTP.Auth
 import Network.Mail.Mime hiding (simpleMail)
 
 import Data.ByteString (ByteString)
@@ -59,46 +57,6 @@ data SMTPConnection = SMTPC !Handle ![ByteString]
 
 instance Eq SMTPConnection where
     (==) (SMTPC a _) (SMTPC b _) = a == b
-
-data Command = HELO ByteString
-             | EHLO ByteString
-             | MAIL ByteString
-             | RCPT ByteString
-             | DATA ByteString
-             | EXPN ByteString
-             | VRFY ByteString
-             | HELP ByteString
-             | AUTH AuthType UserName Password
-             | NOOP
-             | RSET
-             | QUIT
-               deriving (Show, Eq)
-
-type ReplyCode = Int
-
-data Response = Ok
-              | SystemStatus
-              | HelpMessage
-              | ServiceReady
-              | ServiceClosing
-              | UserNotLocal
-              | CannotVerify
-              | StartMailInput
-              | ServiceNotAvailable
-              | MailboxUnavailable
-              | ErrorInProcessing
-              | InsufficientSystemStorage
-              | SyntaxError
-              | ParameterError
-              | CommandNotImplemented
-              | BadSequence
-              | ParameterNotImplemented
-              | MailboxUnavailableError
-              | UserNotLocalError
-              | ExceededStorage
-              | MailboxNotAllowed
-              | TransactionFailed
-                deriving (Show, Eq)
 
 -- | Connect to an SMTP server with the specified host and port
 connectSMTPPort :: String     -- ^ name of the server
