@@ -28,6 +28,7 @@ library
     mime-mail,
     bytestring,
     text,
-    Crypto,
-    base64-string,
+    cryptohash,
+    base16-bytestring,
+    base64-bytestring,
     array

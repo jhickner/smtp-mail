@@ -153,9 +153,9 @@ sendCommand (SMTPC conn _) (DATA dat) =
 sendCommand (SMTPC conn _) (AUTH LOGIN username password) =
     do bsPutCrLf conn command
        parseResponse conn
-       bsPutCrLf conn $ BS.pack userB64
+       bsPutCrLf conn userB64
        parseResponse conn
-       bsPutCrLf conn $ BS.pack passB64
+       bsPutCrLf conn passB64
        (code, msg) <- parseResponse conn
        unless (code == 235) $ fail "authentication failed."
        return (code, msg)
@@ -165,7 +165,7 @@ sendCommand (SMTPC conn _) (AUTH at username password) =
     do bsPutCrLf conn command
        (code, msg) <- parseResponse conn
        unless (code == 334) $ fail "authentication failed."
-       bsPutCrLf conn $ BS.pack $ auth at (BS.unpack msg) username password
+       bsPutCrLf conn $ auth at (BS.unpack msg) username password
        parseResponse conn
     where command = BS.pack $ unwords ["AUTH", show at]
 sendCommand (SMTPC conn _) meth =
