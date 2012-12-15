@@ -21,8 +21,20 @@ or, with authentication:
 main = sendMailWithLogin host port user pass $ simpleMail from [to] subject body (Just html)
 ```
 
-For more complicated scenarios or for adding attachments you can import
-```Network.Mail.Mime``` and construct ```Mail``` objects manually.
+If you'd like to use sendmail, ```Network.Mail.Mime```s sendmail interface is
+reexported as well:
+
+```haskell
+-- send via the default sendmail executable with default options
+renderSendMail $ simpleMail from [to] subject body (Just html)
+
+-- send via the specified executable with specified options
+renderSendMailCustom filepath [opts] $ simpleMail from [to] subject body (Just html)
+```
+
+For more complicated scenarios or for adding attachments or CC/BCC
+addresses you can import ```Network.Mail.Mime``` and construct ```Mail```
+objects manually.
 
 
 ### Thanks

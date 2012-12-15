@@ -15,6 +15,11 @@ module Network.Mail.SMTP
     , AuthType(..)
       -- * Network.Mail.Mime types (reexports)
     , Address (..)
+      -- * Network.Mail.Mime's sendmail interface (reexports)
+    , sendmail
+    , sendmailCustom
+    , renderSendMail
+    , renderSendMailCustom
       -- * Establishing Connection
     , connectSMTPPort
     , connectSMTP
