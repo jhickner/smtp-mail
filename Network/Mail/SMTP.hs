@@ -44,8 +44,6 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import Data.Text.Encoding
 
-import Prelude hiding (catch)
-
 data SMTPConnection = SMTPC !Handle ![ByteString]
 
 data Command = HELO ByteString
@@ -152,9 +150,9 @@ sendCommand (SMTPC conn _) (DATA dat) =
     where sendLine = bsPutCrLf conn
 sendCommand (SMTPC conn _) (AUTH LOGIN username password) =
     do bsPutCrLf conn command
-       parseResponse conn
+       _ <- parseResponse conn
        bsPutCrLf conn userB64
-       parseResponse conn
+       _ <- parseResponse conn
        bsPutCrLf conn passB64
        (code, msg) <- parseResponse conn
        unless (code == 235) $ fail "authentication failed."
@@ -200,9 +198,9 @@ sendRenderedMail :: ByteString   -- ^ sender mail
             -> SMTPConnection
             -> IO ()
 sendRenderedMail sender receivers dat conn = do
-    tryOnce conn (MAIL sender) 250
+    _ <- tryOnce conn (MAIL sender) 250
     mapM_ (\r -> tryOnce conn (RCPT r) 250) receivers
-    tryOnce conn (DATA dat) 250
+    _ <- tryOnce conn (DATA dat) 250
     return ()
 
 -- | Render a 'Mail' to a 'ByteString' then send it over the specified
@@ -226,7 +224,7 @@ sendMail host port mail = do
 sendMailWithLogin :: String -> PortNumber -> UserName -> Password -> Mail -> IO ()
 sendMailWithLogin host port user pass mail = do
   con <- connectSMTPPort host port
-  sendCommand con (AUTH LOGIN user pass)
+  _ <- sendCommand con (AUTH LOGIN user pass)
   renderAndSend con mail
   closeSMTP con
 

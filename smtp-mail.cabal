@@ -32,3 +32,5 @@ library
     base16-bytestring,
     base64-bytestring,
     array
+
+  ghc-options: -Wall -fwarn-tabs
