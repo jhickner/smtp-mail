@@ -28,6 +28,7 @@ module Network.Mail.SMTP
     , connectSMTP
       -- * Operation to a Connection
     , sendCommand
+    , login
     , closeSMTP
     , renderAndSend
     )
@@ -170,7 +171,7 @@ sendCommand (SMTPC conn _) (AUTH LOGIN username password) =
        unless (code == 235) $ fail "authentication failed."
        return (code, msg)
     where command = "AUTH LOGIN"
-          (userB64, passB64) = login username password
+          (userB64, passB64) = encodeLogin username password
 sendCommand (SMTPC conn _) (AUTH at username password) =
     do bsPutCrLf conn command
        (code, msg) <- parseResponse conn
@@ -239,6 +240,10 @@ sendMailWithLogin host port user pass mail = do
   _ <- sendCommand con (AUTH LOGIN user pass)
   renderAndSend con mail
   closeSMTP con
+
+-- | A convenience function that sends 'AUTH' 'LOGIN' to the server
+login :: SMTPConnection -> UserName -> Password -> IO (ReplyCode, ByteString)
+login con user pass = sendCommand con (AUTH LOGIN user pass)
 
 -- | A simple interface for generating a 'Mail' with a plantext body and
 -- an optional HTML body.

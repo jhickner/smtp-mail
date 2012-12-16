@@ -2,7 +2,7 @@ module Network.Mail.SMTP.Auth (
     UserName,
     Password,
     AuthType(..),
-    login,
+    encodeLogin,
     auth,
 ) where
 
@@ -48,11 +48,11 @@ hmacMD5 text key = hash (okey <> hash (ikey <> text))
           ikey = B.pack $ B.zipWith xor key' ipad
           okey = B.pack $ B.zipWith xor key' opad
 
-plain :: UserName -> Password -> ByteString
-plain user pass = b64Encode $ intercalate "\0" [user, user, pass]
+encodePlain :: UserName -> Password -> ByteString
+encodePlain user pass = b64Encode $ intercalate "\0" [user, user, pass]
 
-login :: UserName -> Password -> (ByteString, ByteString)
-login user pass = (b64Encode user, b64Encode pass)
+encodeLogin :: UserName -> Password -> (ByteString, ByteString)
+encodeLogin user pass = (b64Encode user, b64Encode pass)
 
 cramMD5 :: String -> UserName -> Password -> ByteString
 cramMD5 challenge user pass =
@@ -63,6 +63,6 @@ cramMD5 challenge user pass =
     pass'      = toAscii pass
 
 auth :: AuthType -> String -> UserName -> Password -> ByteString
-auth PLAIN    _ u p = plain u p
-auth LOGIN    _ u p = let (u', p') = login u p in B8.unwords [u', p']
+auth PLAIN    _ u p = encodePlain u p
+auth LOGIN    _ u p = let (u', p') = encodeLogin u p in B8.unwords [u', p']
 auth CRAM_MD5 c u p = cramMD5 c u p
