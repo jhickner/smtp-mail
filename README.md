@@ -8,15 +8,16 @@ Making it easy to send SMTP emails from Haskell.
 ```haskell
 import Network.Mail.SMTP
 
-from    = Address Nothing "email@domain.com"
-to      = [Address (Just "Jason Hickner") "email@domain.com"]
-cc      = []
-bcc     = []
-subject = "email subject"
-body    = "email body"
-html    = Just "<h1>HTML</h1>" -- optional html body
+from       = Address Nothing "email@domain.com"
+to         = [Address (Just "Jason Hickner") "email@domain.com"]
+cc         = []
+bcc        = []
+subject    = "email subject"
+body       = plainTextPart "email body"
+html       = htmlPart "<h1>HTML</h1>"
+attachment = filePart "path/to/attachment.zip"
 
-mail = simpleMail from to cc bcc subject body html
+mail = simpleMail from to cc bcc subject [body, html, attachment]
 
 main = sendMail host port mail
 ```

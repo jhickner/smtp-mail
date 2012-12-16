@@ -4,6 +4,9 @@ module Network.Mail.SMTP
       sendMail
     , sendMailWithLogin
     , simpleMail
+    , plainTextPart
+    , htmlPart
+    , filePart
     -- * Types
     , Command(..)
     , Response(..)
@@ -31,6 +34,7 @@ module Network.Mail.SMTP
     where
 
 import System.IO
+import System.FilePath (takeFileName)
 
 import Control.Monad (unless)
 import Data.Monoid
@@ -243,24 +247,34 @@ simpleMail :: Address   -- ^ from
            -> [Address] -- ^ CC
            -> [Address] -- ^ BCC
            -> T.Text -- ^ subject
-           -> TL.Text -- ^ plain body
-           -> Maybe TL.Text -- ^ optional HTML body
+           -> [Part] -- ^ list of parts (list your preferred part last)
            -> Mail
-simpleMail from to cc bcc subject plainBody htmlBody =
+simpleMail from to cc bcc subject parts =
     Mail { mailFrom = from
          , mailTo   = to
          , mailCc   = cc
          , mailBcc  = bcc
          , mailHeaders = [ ("Subject", subject) ]
-         , mailParts =   [ parts plainBody htmlBody ]
+         , mailParts = [parts]
          }
-  where 
-    plainPart plain' = Part "text/plain; charset=utf-8" 
-      QuotedPrintableText Nothing [] $ TL.encodeUtf8 plain'
-    htmlPart html' = Part "text/html; charset=utf-8" 
-      QuotedPrintableText Nothing [] $ TL.encodeUtf8 html'
-    parts plain' Nothing      = [ plainPart plain' ]
-    parts plain' (Just html') = [ plainPart plain', htmlPart html' ]
+
+-- | Construct a plain text 'Part'
+plainTextPart :: TL.Text -> Part
+plainTextPart = Part "text/plain; charset=utf-8" 
+              QuotedPrintableText Nothing [] . TL.encodeUtf8
+
+-- | Construct an html 'Part'
+htmlPart :: TL.Text -> Part
+htmlPart = Part "text/html; charset=utf-8" 
+             QuotedPrintableText Nothing [] . TL.encodeUtf8
+
+-- | Construct a file attachment 'Part'
+filePart :: T.Text -- ^ content type
+         -> FilePath -- ^ path to file 
+         -> IO Part
+filePart ct fp = do
+    content <- B.readFile fp
+    return $ Part ct Base64 (Just $ T.pack (takeFileName fp)) [] content 
 
 lazyToStrict :: B.ByteString -> S.ByteString
 lazyToStrict = S.concat . B.toChunks
