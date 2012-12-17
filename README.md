@@ -16,11 +16,18 @@ subject    = "email subject"
 body       = plainTextPart "email body"
 html       = htmlPart "<h1>HTML</h1>"
 
-mail = do
-  attachment <- filePart "application/octet-stream" "path/to/attachment.zip"
-  simpleMail from to cc bcc subject [body, html, attachment]
+mail = simpleMail from to cc bcc subject [body, html]
 
 main = sendMail host port mail
+```
+
+or with an attachment:
+
+```haskell
+main = do
+  attachment <- filePart "application/octet-stream" "path/to/attachment.zip"
+  let mail = simpleMail from to cc bcc subject [body, html, attachment]
+  sendMail host port mail
 ```
 
 or, with authentication:
