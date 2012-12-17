@@ -15,9 +15,10 @@ bcc        = []
 subject    = "email subject"
 body       = plainTextPart "email body"
 html       = htmlPart "<h1>HTML</h1>"
-attachment = filePart "path/to/attachment.zip"
 
-mail = simpleMail from to cc bcc subject [body, html, attachment]
+mail = do
+  attachment <- filePart "application/octet-stream" "path/to/attachment.zip"
+  simpleMail from to cc bcc subject [body, html, attachment]
 
 main = sendMail host port mail
 ```
