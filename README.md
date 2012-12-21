@@ -40,6 +40,9 @@ or, with authentication:
 main = sendMailWithLogin host user pass mail
 ```
 
+Note: `sendMail'` and `sendMailWithLogin'` variations are also provided if you want to specify a port as well as a hostname.
+
+
 ### Sending with sendmail
 
 If you'd like to use sendmail, the sendmail interface from ```Network.Mail.Mime``` 
