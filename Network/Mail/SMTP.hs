@@ -2,7 +2,9 @@
 module Network.Mail.SMTP
     ( -- * Main interface
       sendMail
+    , sendMail'
     , sendMailWithLogin
+    , sendMailWithLogin'
     , simpleMail
     , plainTextPart
     , htmlPart
@@ -19,8 +21,8 @@ module Network.Mail.SMTP
     , renderSendMailCustom
 
       -- * Establishing Connection
-    , connectSMTPPort
     , connectSMTP
+    , connectSMTP'
 
       -- * Operation to a Connection
     , sendCommand
@@ -58,17 +60,17 @@ data SMTPConnection = SMTPC !Handle ![ByteString]
 instance Eq SMTPConnection where
     (==) (SMTPC a _) (SMTPC b _) = a == b
 
+-- | Connect to an SMTP server with the specified host and default port (25)
+connectSMTP :: HostName     -- ^ name of the server
+            -> IO SMTPConnection
+connectSMTP = flip connectSMTP' 25
+
 -- | Connect to an SMTP server with the specified host and port
-connectSMTPPort :: String     -- ^ name of the server
+connectSMTP' :: HostName     -- ^ name of the server
                 -> PortNumber -- ^ port number
                 -> IO SMTPConnection
-connectSMTPPort hostname port =
+connectSMTP' hostname port =
     connectTo hostname (PortNumber port) >>= connectStream
-
--- | Connect to an SMTP server with the specified host and default port (25)
-connectSMTP :: String     -- ^ name of the server
-            -> IO SMTPConnection
-connectSMTP = flip connectSMTPPort 25
 
 -- | Attemp to send a 'Command' to the SMTP server once
 tryOnce :: SMTPConnection -> Command -> ReplyCode -> IO ByteString
@@ -187,17 +189,32 @@ renderAndSend conn mail@Mail{..} = do
         from = enc mailFrom
         to   = map enc mailTo
 
+-- | Connect to an SMTP server, send a 'Mail', then disconnect.  Uses the default port (25).
+sendMail :: HostName -> Mail -> IO ()
+sendMail host mail = do
+  con <- connectSMTP host
+  renderAndSend con mail
+  closeSMTP con
+
 -- | Connect to an SMTP server, send a 'Mail', then disconnect.
-sendMail :: String -> PortNumber -> Mail -> IO ()
-sendMail host port mail = do
-  con <- connectSMTPPort host port
+sendMail' :: HostName -> PortNumber -> Mail -> IO ()
+sendMail' host port mail = do
+  con <- connectSMTP' host port
+  renderAndSend con mail
+  closeSMTP con
+
+-- | Connect to an SMTP server, login, send a 'Mail', disconnect.  Uses the default port (25).
+sendMailWithLogin :: HostName -> UserName -> Password -> Mail -> IO ()
+sendMailWithLogin host user pass mail = do
+  con <- connectSMTP host
+  _ <- sendCommand con (AUTH LOGIN user pass)
   renderAndSend con mail
   closeSMTP con
 
 -- | Connect to an SMTP server, login, send a 'Mail', disconnect.
-sendMailWithLogin :: String -> PortNumber -> UserName -> Password -> Mail -> IO ()
-sendMailWithLogin host port user pass mail = do
-  con <- connectSMTPPort host port
+sendMailWithLogin' :: HostName -> PortNumber -> UserName -> Password -> Mail -> IO ()
+sendMailWithLogin' host port user pass mail = do
+  con <- connectSMTP' host port
   _ <- sendCommand con (AUTH LOGIN user pass)
   renderAndSend con mail
   closeSMTP con
