@@ -10,6 +10,8 @@ cabal install smtp-email
 ### Sending with an SMTP server
 
 ```haskell
+{-# LANGUAGE OverloadedStrings #-}
+
 import Network.Mail.SMTP
 
 from       = Address Nothing "email@domain.com"
