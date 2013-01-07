@@ -4,7 +4,7 @@ SMTP-MAIL
 Making it easy to send SMTP emails from Haskell.
 
 ```
-cabal install smtp-email
+cabal install smtp-mail
 ```
 
 ### Sending with an SMTP server
