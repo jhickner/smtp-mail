@@ -121,9 +121,14 @@ sendCommand (SMTPC conn _) (DATA dat) =
     do bsPutCrLf conn "DATA"
        (code, _) <- parseResponse conn
        unless (code == 354) $ fail "this server cannot accept any data."
-       mapM_ sendLine $ BS.lines dat ++ [BS.pack "."]
+       mapM_ sendLine $ split dat ++ [BS.pack "."]
        parseResponse conn
-    where sendLine = bsPutCrLf conn
+    where 
+      sendLine = bsPutCrLf conn
+      -- split on '\n' and remove any trailing '\r' from parts
+      split = map stripCR . BS.lines
+      stripCR s = if cr `BS.isSuffixOf` s then BS.init s else s
+      cr = BS.pack "\r"
 sendCommand (SMTPC conn _) (AUTH LOGIN username password) =
     do bsPutCrLf conn command
        _ <- parseResponse conn
