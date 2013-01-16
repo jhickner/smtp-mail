@@ -47,9 +47,9 @@ import Network.BSD (getHostName)
 import Network.Mail.Mime hiding (simpleMail)
 
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS
-import qualified Data.ByteString.Lazy as B
-import qualified Data.ByteString as S
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B8
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
@@ -99,20 +99,20 @@ connectStream st =
               do hClose st
                  fail "cannot connect to the server"
        senderHost <- getHostName
-       msg <- tryCommand 3 (SMTPC st []) (EHLO $ BS.pack senderHost) 250
-       return (SMTPC st (tail $ BS.lines msg))
+       msg <- tryCommand 3 (SMTPC st []) (EHLO $ B8.pack senderHost) 250
+       return (SMTPC st (tail $ B8.lines msg))
 
 parseResponse :: Handle -> IO (ReplyCode, ByteString)
 parseResponse st =
     do (code, bdy) <- readLines
-       return (read $ BS.unpack code, BS.unlines bdy)
+       return (read $ B8.unpack code, B8.unlines bdy)
     where readLines =
-              do l <- BS.hGetLine st
-                 let (c, bdy) = BS.span isDigit l
-                 if not (BS.null bdy) && BS.head bdy == '-'
+              do l <- B8.hGetLine st
+                 let (c, bdy) = B8.span isDigit l
+                 if not (B8.null bdy) && B8.head bdy == '-'
                     then do (c2, ls) <- readLines
-                            return (c2, BS.tail bdy:ls)
-                    else return (c, [BS.tail bdy])
+                            return (c2, B8.tail bdy:ls)
+                    else return (c, [B8.tail bdy])
 
 
 -- | Send a 'Command' to the SMTP server
@@ -126,13 +126,13 @@ sendCommand (SMTPC conn _) (DATA dat) =
        parseResponse conn
     where 
       sendLine = bsPutCrLf conn
-      split = map (padDot . stripCR) . BS.lines
+      split = map (padDot . stripCR) . B8.lines
       -- remove \r at the end of a line
-      stripCR s = if cr `BS.isSuffixOf` s then BS.init s else s
+      stripCR s = if cr `B8.isSuffixOf` s then B8.init s else s
       -- duplicate . at the start of a line
-      padDot s = if dot `BS.isPrefixOf` s then dot <> s else s
-      cr = BS.pack "\r"
-      dot = BS.pack "."
+      padDot s = if dot `B8.isPrefixOf` s then dot <> s else s
+      cr = B8.pack "\r"
+      dot = B8.pack "."
 
 
 sendCommand (SMTPC conn _) (AUTH LOGIN username password) =
@@ -150,9 +150,9 @@ sendCommand (SMTPC conn _) (AUTH at username password) =
     do bsPutCrLf conn command
        (code, msg) <- parseResponse conn
        unless (code == 334) $ fail "authentication failed."
-       bsPutCrLf conn $ auth at (BS.unpack msg) username password
+       bsPutCrLf conn $ auth at (B8.unpack msg) username password
        parseResponse conn
-    where command = BS.pack $ unwords ["AUTH", show at]
+    where command = B8.pack $ unwords ["AUTH", show at]
 sendCommand (SMTPC conn _) meth =
     do bsPutCrLf conn command
        parseResponse conn
@@ -163,7 +163,7 @@ sendCommand (SMTPC conn _) meth =
                       (RCPT param) -> "RCPT TO:<" <> param <> ">"
                       (EXPN param) -> "EXPN " <> param
                       (VRFY param) -> "VRFY " <> param
-                      (HELP msg)   -> if BS.null msg
+                      (HELP msg)   -> if B8.null msg
                                         then "HELP\r\n"
                                         else "HELP " <> msg
                       NOOP         -> "NOOP"
@@ -267,14 +267,14 @@ filePart :: T.Text -- ^ content type
          -> FilePath -- ^ path to file 
          -> IO Part
 filePart ct fp = do
-    content <- B.readFile fp
+    content <- BL.readFile fp
     return $ Part ct Base64 (Just $ T.pack (takeFileName fp)) [] content 
 
-lazyToStrict :: B.ByteString -> S.ByteString
-lazyToStrict = S.concat . B.toChunks
+lazyToStrict :: BL.ByteString -> B.ByteString
+lazyToStrict = B.concat . BL.toChunks
 
-crlf :: BS.ByteString
-crlf = BS.pack "\r\n"
+crlf :: B8.ByteString
+crlf = B8.pack "\r\n"
 
 bsPutCrLf :: Handle -> ByteString -> IO ()
-bsPutCrLf h s = BS.hPut h s >> BS.hPut h crlf >> hFlush h
+bsPutCrLf h s = B8.hPut h s >> B8.hPut h crlf >> hFlush h
