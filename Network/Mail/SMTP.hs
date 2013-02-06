@@ -93,86 +93,93 @@ tryCommand tries st cmd expectedReply = do
 
 -- | Create an 'SMTPConnection' from an already connected Handle
 connectStream :: Handle -> IO SMTPConnection
-connectStream st =
-    do (code1, _) <- parseResponse st
-       unless (code1 == 220) $
-              do hClose st
-                 fail "cannot connect to the server"
-       senderHost <- getHostName
-       msg <- tryCommand 3 (SMTPC st []) (EHLO $ B8.pack senderHost) 250
-       return (SMTPC st (tail $ B8.lines msg))
+connectStream st = do
+    (code1, _) <- parseResponse st
+    unless (code1 == 220) $ do
+        hClose st
+        fail "cannot connect to the server"
+    senderHost <- getHostName
+    msg <- tryCommand 3 (SMTPC st []) (EHLO $ B8.pack senderHost) 250
+    return (SMTPC st (tail $ B8.lines msg))
 
 parseResponse :: Handle -> IO (ReplyCode, ByteString)
-parseResponse st =
-    do (code, bdy) <- readLines
-       return (read $ B8.unpack code, B8.unlines bdy)
-    where readLines =
-              do l <- B8.hGetLine st
-                 let (c, bdy) = B8.span isDigit l
-                 if not (B8.null bdy) && B8.head bdy == '-'
-                    then do (c2, ls) <- readLines
-                            return (c2, B8.tail bdy:ls)
-                    else return (c, [B8.tail bdy])
+parseResponse st = do
+    (code, bdy) <- readLines
+    return (read $ B8.unpack code, B8.unlines bdy)
+  where
+    readLines = do
+        l <- B8.hGetLine st
+        let (c, bdy) = B8.span isDigit l
+        if not (B8.null bdy) && B8.head bdy == '-'
+           then do (c2, ls) <- readLines
+                   return (c2, B8.tail bdy:ls)
+           else return (c, [B8.tail bdy])
 
 
 -- | Send a 'Command' to the SMTP server
 sendCommand :: SMTPConnection -> Command -> IO (ReplyCode, ByteString)
-sendCommand (SMTPC conn _) (DATA dat) =
-    do bsPutCrLf conn "DATA"
-       (code, _) <- parseResponse conn
-       unless (code == 354) $ fail "this server cannot accept any data."
-       mapM_ sendLine $ split dat
-       sendLine dot
-       parseResponse conn
-    where 
-      sendLine = bsPutCrLf conn
-      split = map (padDot . stripCR) . B8.lines
-      -- remove \r at the end of a line
-      stripCR s = if cr `B8.isSuffixOf` s then B8.init s else s
-      -- duplicate . at the start of a line
-      padDot s = if dot `B8.isPrefixOf` s then dot <> s else s
-      cr = B8.pack "\r"
-      dot = B8.pack "."
 
+sendCommand (SMTPC conn _) (DATA dat) = do
+    bsPutCrLf conn "DATA"
+    (code, _) <- parseResponse conn
+    unless (code == 354) $ fail "this server cannot accept any data."
+    mapM_ sendLine $ split dat
+    sendLine dot
+    parseResponse conn
+  where
+    sendLine = bsPutCrLf conn
+    split = map (padDot . stripCR) . B8.lines
+    -- remove \r at the end of a line
+    stripCR s = if cr `B8.isSuffixOf` s then B8.init s else s
+    -- duplicate . at the start of a line
+    padDot s = if dot `B8.isPrefixOf` s then dot <> s else s
+    cr = B8.pack "\r"
+    dot = B8.pack "."
 
-sendCommand (SMTPC conn _) (AUTH LOGIN username password) =
-    do bsPutCrLf conn command
-       _ <- parseResponse conn
-       bsPutCrLf conn userB64
-       _ <- parseResponse conn
-       bsPutCrLf conn passB64
-       (code, msg) <- parseResponse conn
-       unless (code == 235) $ fail "authentication failed."
-       return (code, msg)
-    where command = "AUTH LOGIN"
-          (userB64, passB64) = encodeLogin username password
-sendCommand (SMTPC conn _) (AUTH at username password) =
-    do bsPutCrLf conn command
-       (code, msg) <- parseResponse conn
-       unless (code == 334) $ fail "authentication failed."
-       bsPutCrLf conn $ auth at (B8.unpack msg) username password
-       parseResponse conn
-    where command = B8.pack $ unwords ["AUTH", show at]
-sendCommand (SMTPC conn _) meth =
-    do bsPutCrLf conn command
-       parseResponse conn
-    where command = case meth of
-                      (HELO param) -> "HELO " <> param
-                      (EHLO param) -> "EHLO " <> param
-                      (MAIL param) -> "MAIL FROM:<" <> param <> ">"
-                      (RCPT param) -> "RCPT TO:<" <> param <> ">"
-                      (EXPN param) -> "EXPN " <> param
-                      (VRFY param) -> "VRFY " <> param
-                      (HELP msg)   -> if B8.null msg
-                                        then "HELP\r\n"
-                                        else "HELP " <> msg
-                      NOOP         -> "NOOP"
-                      RSET         -> "RSET"
-                      QUIT         -> "QUIT"
-                      DATA{}       -> 
-                          error "BUG: DATA pattern should be matched by sendCommand patterns"
-                      AUTH{}       ->
-                          error "BUG: AUTH pattern should be matched by sendCommand patterns"
+sendCommand (SMTPC conn _) (AUTH LOGIN username password) = do
+    bsPutCrLf conn command
+    _ <- parseResponse conn
+    bsPutCrLf conn userB64
+    _ <- parseResponse conn
+    bsPutCrLf conn passB64
+    (code, msg) <- parseResponse conn
+    unless (code == 235) $ fail "authentication failed."
+    return (code, msg)
+  where
+    command = "AUTH LOGIN"
+    (userB64, passB64) = encodeLogin username password
+
+sendCommand (SMTPC conn _) (AUTH at username password) = do
+    bsPutCrLf conn command
+    (code, msg) <- parseResponse conn
+    unless (code == 334) $ fail "authentication failed."
+    bsPutCrLf conn $ auth at (B8.unpack msg) username password
+    parseResponse conn
+  where
+    command = B8.pack $ unwords ["AUTH", show at]
+
+sendCommand (SMTPC conn _) meth = do
+    bsPutCrLf conn command
+    parseResponse conn
+  where
+    command = case meth of
+        (HELO param) -> "HELO " <> param
+        (EHLO param) -> "EHLO " <> param
+        (MAIL param) -> "MAIL FROM:<" <> param <> ">"
+        (RCPT param) -> "RCPT TO:<" <> param <> ">"
+        (EXPN param) -> "EXPN " <> param
+        (VRFY param) -> "VRFY " <> param
+        (HELP msg)   -> if B8.null msg
+                          then "HELP\r\n"
+                          else "HELP " <> msg
+        NOOP         -> "NOOP"
+        RSET         -> "RSET"
+        QUIT         -> "QUIT"
+        DATA{}       ->
+            error "BUG: DATA pattern should be matched by sendCommand patterns"
+        AUTH{}       ->
+            error "BUG: AUTH pattern should be matched by sendCommand patterns"
+
 
 -- | Send 'QUIT' and close the connection.
 closeSMTP :: SMTPConnection -> IO ()
