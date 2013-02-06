@@ -20,10 +20,11 @@ import qualified Data.ByteString.Char8 as B8    (unwords)
 type UserName = String
 type Password = String
 
-data AuthType = PLAIN
-              | LOGIN
-              | CRAM_MD5
-                deriving Eq
+data AuthType
+    = PLAIN
+    | LOGIN
+    | CRAM_MD5
+    deriving Eq
 
 instance Show AuthType where
     showsPrec d at = showParen (d>app_prec) $ showString $ showMain at
