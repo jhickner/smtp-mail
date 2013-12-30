@@ -80,16 +80,24 @@ tryOnce = tryCommand 1
 tryCommand :: Int -> SMTPConnection -> Command -> ReplyCode
            -> IO ByteString
 tryCommand tries st cmd expectedReply = do
-    (code, msg) <- sendCommand st cmd
-    if code == expectedReply 
+    (code, msg) <- tryCommandNoFail tries st cmd expectedReply
+    if code == expectedReply
       then return msg
-      else if tries > 1
-        then tryCommand (tries - 1) st cmd expectedReply
-        else do
-          closeSMTP st
-          fail $ "Unexpected reply to: " ++ show cmd ++ 
-            ", Expected reply code: " ++ show expectedReply ++
-            ", Got this instead: " ++ show code ++ " " ++ show msg
+      else do
+        closeSMTP st
+        fail $ "Unexpected reply to: " ++ show cmd ++
+          ", Expected reply code: " ++ show expectedReply ++
+          ", Got this instead: " ++ show code ++ " " ++ show msg
+
+tryCommandNoFail :: Int -> SMTPConnection -> Command -> ReplyCode
+                 -> IO (ReplyCode, ByteString)
+tryCommandNoFail tries st cmd expectedReply = do
+  (code, msg) <- sendCommand st cmd
+  if code == expectedReply
+    then return (code, msg)
+    else if tries > 1
+      then tryCommandNoFail (tries - 1) st cmd expectedReply
+      else return (code, msg)
 
 -- | Create an 'SMTPConnection' from an already connected Handle
 connectStream :: Handle -> IO SMTPConnection
@@ -99,8 +107,12 @@ connectStream st = do
         hClose st
         fail "cannot connect to the server"
     senderHost <- getHostName
-    msg <- tryCommand 3 (SMTPC st []) (EHLO $ B8.pack senderHost) 250
-    return (SMTPC st (tail $ B8.lines msg))
+    (code, initialMsg) <- tryCommandNoFail 3 (SMTPC st []) (EHLO $ B8.pack senderHost) 250
+    if code == 250
+      then return (SMTPC st (tail $ B8.lines initialMsg))
+      else do -- EHLO failed, try HELO
+        msg <- tryCommand 3 (SMTPC st []) (HELO $ B8.pack senderHost) 250
+        return (SMTPC st (tail $ B8.lines msg))
 
 parseResponse :: Handle -> IO (ReplyCode, ByteString)
 parseResponse st = do
