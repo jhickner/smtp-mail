@@ -44,7 +44,7 @@ import Data.Char (isDigit)
 
 import Network
 import Network.BSD (getHostName)
-import Network.Mail.Mime hiding (simpleMail)
+import Network.Mail.Mime hiding (htmlPart, simpleMail)
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
