@@ -54,6 +54,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import Data.Text.Encoding
+import Data.Maybe (fromMaybe)
 
 data SMTPConnection = SMTPC !Handle ![ByteString]
 
@@ -63,14 +64,15 @@ instance Eq SMTPConnection where
 -- | Connect to an SMTP server with the specified host and default port (25)
 connectSMTP :: HostName     -- ^ name of the server
             -> IO SMTPConnection
-connectSMTP = flip connectSMTP' 25
+connectSMTP hostname = connectSMTP' hostname 25 Nothing
 
 -- | Connect to an SMTP server with the specified host and port
 connectSMTP' :: HostName     -- ^ name of the server
                 -> PortNumber -- ^ port number
+                -> Maybe (IO String)
                 -> IO SMTPConnection
-connectSMTP' hostname port =
-    connectTo hostname (PortNumber port) >>= connectStream
+connectSMTP' hostname port mHostname =
+    connectTo hostname (PortNumber port) >>= connectStream (fromMaybe getHostName mHostname)
 
 -- | Attemp to send a 'Command' to the SMTP server once
 tryOnce :: SMTPConnection -> Command -> ReplyCode -> IO ByteString
@@ -100,13 +102,13 @@ tryCommandNoFail tries st cmd expectedReply = do
       else return (code, msg)
 
 -- | Create an 'SMTPConnection' from an already connected Handle
-connectStream :: Handle -> IO SMTPConnection
-connectStream st = do
+connectStream :: IO String -> Handle -> IO SMTPConnection
+connectStream getMailHostName st = do
     (code1, _) <- parseResponse st
     unless (code1 == 220) $ do
         hClose st
         fail "cannot connect to the server"
-    senderHost <- getHostName
+    senderHost <- getMailHostName
     (code, initialMsg) <- tryCommandNoFail 3 (SMTPC st []) (EHLO $ B8.pack senderHost) 250
     if code == 250
       then return (SMTPC st (tail $ B8.lines initialMsg))
@@ -197,7 +199,7 @@ sendCommand (SMTPC conn _) meth = do
 closeSMTP :: SMTPConnection -> IO ()
 closeSMTP c@(SMTPC conn _) = sendCommand c QUIT >> hClose conn
 
--- | Sends a rendered mail to the server. 
+-- | Sends a rendered mail to the server.
 sendRenderedMail :: ByteString   -- ^ sender mail
             -> [ByteString] -- ^ receivers
             -> ByteString   -- ^ data
@@ -215,7 +217,7 @@ renderAndSend ::SMTPConnection -> Mail -> IO ()
 renderAndSend conn mail@Mail{..} = do
     rendered <- lazyToStrict `fmap` renderMail' mail
     sendRenderedMail from to rendered conn
-  where enc  = encodeUtf8 . addressEmail 
+  where enc  = encodeUtf8 . addressEmail
         from = enc mailFrom
         to   = map enc mailTo
 
@@ -229,7 +231,7 @@ sendMail host mail = do
 -- | Connect to an SMTP server, send a 'Mail', then disconnect.
 sendMail' :: HostName -> PortNumber -> Mail -> IO ()
 sendMail' host port mail = do
-  con <- connectSMTP' host port
+  con <- connectSMTP' host port Nothing
   renderAndSend con mail
   closeSMTP con
 
@@ -244,7 +246,7 @@ sendMailWithLogin host user pass mail = do
 -- | Connect to an SMTP server, login, send a 'Mail', disconnect.
 sendMailWithLogin' :: HostName -> PortNumber -> UserName -> Password -> Mail -> IO ()
 sendMailWithLogin' host port user pass mail = do
-  con <- connectSMTP' host port
+  con <- connectSMTP' host port Nothing
   _ <- sendCommand con (AUTH LOGIN user pass)
   renderAndSend con mail
   closeSMTP con
@@ -273,21 +275,21 @@ simpleMail from to cc bcc subject parts =
 
 -- | Construct a plain text 'Part'
 plainTextPart :: TL.Text -> Part
-plainTextPart = Part "text/plain; charset=utf-8" 
+plainTextPart = Part "text/plain; charset=utf-8"
               QuotedPrintableText Nothing [] . TL.encodeUtf8
 
 -- | Construct an html 'Part'
 htmlPart :: TL.Text -> Part
-htmlPart = Part "text/html; charset=utf-8" 
+htmlPart = Part "text/html; charset=utf-8"
              QuotedPrintableText Nothing [] . TL.encodeUtf8
 
 -- | Construct a file attachment 'Part'
 filePart :: T.Text -- ^ content type
-         -> FilePath -- ^ path to file 
+         -> FilePath -- ^ path to file
          -> IO Part
 filePart ct fp = do
     content <- BL.readFile fp
-    return $ Part ct Base64 (Just $ T.pack (takeFileName fp)) [] content 
+    return $ Part ct Base64 (Just $ T.pack (takeFileName fp)) [] content
 
 lazyToStrict :: BL.ByteString -> B.ByteString
 lazyToStrict = B.concat . BL.toChunks
