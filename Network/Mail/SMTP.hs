@@ -221,6 +221,20 @@ sendMailWithLogin' host port user pass mail = do
   renderAndSend con mail
   closeSMTP con
 
+-- | Send a 'Mail' with a given sender.
+sendMailWithSender :: ByteString -> HostName -> PortNumber -> Mail -> IO ()
+sendMailWithSender sender host port mail = do
+    con <- connectSMTP' host port
+    renderAndSendFrom sender con mail
+    closeSMTP con
+
+renderAndSendFrom :: ByteString -> SMTPConnection -> Mail -> IO ()
+renderAndSendFrom sender conn mail@Mail{..} = do
+    rendered <- BL.toStrict `fmap` renderMail' mail
+    sendRenderedMail sender to rendered conn
+  where enc  = encodeUtf8 . addressEmail
+        to   = map enc mailTo
+
 -- | A convenience function that sends 'AUTH' 'LOGIN' to the server
 login :: SMTPConnection -> UserName -> Password -> IO (ReplyCode, ByteString)
 login con user pass = sendCommand con (AUTH LOGIN user pass)
