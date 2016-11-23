@@ -1,59 +1,31 @@
-{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, RecordWildCards #-}
-module Network.Mail.SMTP
-    ( -- * Main interface
-      sendMail
-    , sendMail'
-    , sendMailWithLogin
-    , sendMailWithLogin'
-    , simpleMail
-    , plainTextPart
-    , htmlPart
-    , filePart
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
-    -- * Types
-    , module Network.Mail.SMTP.Types
-    , SMTPConnection
+module Network.Mail.SMTP where
 
-      -- * Network.Mail.Mime's sendmail interface (reexports)
-    , sendmail
-    , sendmailCustom
-    , renderSendMail
-    , renderSendMailCustom
+import           Network.Mail.SMTP.Auth
+import           Network.Mail.SMTP.Types
 
-      -- * Establishing Connection
-    , connectSMTP
-    , connectSMTP'
+import           System.FilePath         (takeFileName)
+import           System.IO
 
-      -- * Operation to a Connection
-    , sendCommand
-    , login
-    , closeSMTP
-    , renderAndSend
-    )
-    where
+import           Control.Monad           (unless)
+import           Data.Char               (isDigit)
+import           Data.Monoid
 
-import Network.Mail.SMTP.Auth
-import Network.Mail.SMTP.Types
+import           Network
+import           Network.BSD             (getHostName)
+import           Network.Mail.Mime       hiding (htmlPart, simpleMail)
 
-import System.IO
-import System.FilePath (takeFileName)
-
-import Control.Monad (unless)
-import Data.Monoid
-import Data.Char (isDigit)
-
-import Network
-import Network.BSD (getHostName)
-import Network.Mail.Mime hiding (htmlPart, simpleMail)
-
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as B8
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
+import           Data.ByteString         (ByteString)
+import qualified Data.ByteString         as B
+import qualified Data.ByteString.Char8   as B8
+import qualified Data.ByteString.Lazy    as BL
+import qualified Data.Text               as T
+import           Data.Text.Encoding
+import qualified Data.Text.Lazy          as TL
 import qualified Data.Text.Lazy.Encoding as TL
-import Data.Text.Encoding
 
 data SMTPConnection = SMTPC !Handle ![ByteString]
 
@@ -197,7 +169,7 @@ sendCommand (SMTPC conn _) meth = do
 closeSMTP :: SMTPConnection -> IO ()
 closeSMTP c@(SMTPC conn _) = sendCommand c QUIT >> hClose conn
 
--- | Sends a rendered mail to the server. 
+-- | Sends a rendered mail to the server.
 sendRenderedMail :: ByteString   -- ^ sender mail
             -> [ByteString] -- ^ receivers
             -> ByteString   -- ^ data
@@ -215,7 +187,7 @@ renderAndSend ::SMTPConnection -> Mail -> IO ()
 renderAndSend conn mail@Mail{..} = do
     rendered <- lazyToStrict `fmap` renderMail' mail
     sendRenderedMail from to rendered conn
-  where enc  = encodeUtf8 . addressEmail 
+  where enc  = encodeUtf8 . addressEmail
         from = enc mailFrom
         to   = map enc mailTo
 
@@ -273,21 +245,21 @@ simpleMail from to cc bcc subject parts =
 
 -- | Construct a plain text 'Part'
 plainTextPart :: TL.Text -> Part
-plainTextPart = Part "text/plain; charset=utf-8" 
+plainTextPart = Part "text/plain; charset=utf-8"
               QuotedPrintableText Nothing [] . TL.encodeUtf8
 
 -- | Construct an html 'Part'
 htmlPart :: TL.Text -> Part
-htmlPart = Part "text/html; charset=utf-8" 
+htmlPart = Part "text/html; charset=utf-8"
              QuotedPrintableText Nothing [] . TL.encodeUtf8
 
 -- | Construct a file attachment 'Part'
 filePart :: T.Text -- ^ content type
-         -> FilePath -- ^ path to file 
+         -> FilePath -- ^ path to file
          -> IO Part
 filePart ct fp = do
     content <- BL.readFile fp
-    return $ Part ct Base64 (Just $ T.pack (takeFileName fp)) [] content 
+    return $ Part ct Base64 (Just $ T.pack (takeFileName fp)) [] content
 
 lazyToStrict :: BL.ByteString -> B.ByteString
 lazyToStrict = B.concat . BL.toChunks
