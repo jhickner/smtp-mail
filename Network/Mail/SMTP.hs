@@ -3,6 +3,39 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Network.Mail.SMTP where
+   ( -- * Main interface
+     sendMail
+   , sendMail'
+   , sendMailWithLogin
+   , sendMailWithLogin'
+   , sendMailWithSender
+   , sendMailWithSender'
+   , simpleMail
+   , plainTextPart
+   , htmlPart
+   , filePart
+
+   -- * Types
+   , module Network.Mail.SMTP.Types
+   , SMTPConnection
+
+     -- * Network.Mail.Mime's sendmail interface (reexports)
+   , sendmail
+   , sendmailCustom
+   , renderSendMail
+   , renderSendMailCustom
+
+     -- * Establishing Connection
+   , connectSMTP
+   , connectSMTP'
+
+     -- * Operation to a Connection
+   , sendCommand
+   , login
+   , closeSMTP
+   , renderAndSend
+   , renderAndSendFrom
+   )
 
 import           Network.Mail.SMTP.Auth
 import           Network.Mail.SMTP.Types
@@ -222,8 +255,15 @@ sendMailWithLogin' host port user pass mail = do
   closeSMTP con
 
 -- | Send a 'Mail' with a given sender.
-sendMailWithSender :: ByteString -> HostName -> PortNumber -> Mail -> IO ()
-sendMailWithSender sender host port mail = do
+sendMailWithSender :: ByteString -> HostName -> Mail -> IO ()
+sendMailWithSender sender host mail = do
+    con <- connectSMTP host
+    renderAndSendFrom sender con mail
+    closeSMTP con
+
+-- | Send a 'Mail' with a given sender.
+sendMailWithSender' :: ByteString -> HostName -> PortNumber -> Mail -> IO ()
+sendMailWithSender' sender host port mail = do
     con <- connectSMTP' host port
     renderAndSendFrom sender con mail
     closeSMTP con
