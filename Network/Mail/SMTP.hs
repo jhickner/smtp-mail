@@ -1,8 +1,6 @@
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RecordWildCards     #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, RecordWildCards #-}
 
-module Network.Mail.SMTP where
+module Network.Mail.SMTP
     ( -- * Main interface
       sendMail
     , sendMail'
@@ -35,30 +33,30 @@ module Network.Mail.SMTP where
     , closeSMTP
     , renderAndSend
     , renderAndSendFrom
-    )
+    ) where
 
-import           Network.Mail.SMTP.Auth
-import           Network.Mail.SMTP.Types
+import Network.Mail.SMTP.Auth
+import Network.Mail.SMTP.Types
 
-import           System.FilePath         (takeFileName)
-import           System.IO
+import System.IO
+import System.FilePath (takeFileName)
 
-import           Control.Monad           (unless)
-import           Data.Char               (isDigit)
-import           Data.Monoid
+import Control.Monad (unless)
+import Data.Monoid
+import Data.Char (isDigit)
 
-import           Network
-import           Network.BSD             (getHostName)
-import           Network.Mail.Mime       hiding (htmlPart, simpleMail)
+import Network
+import Network.BSD (getHostName)
+import Network.Mail.Mime hiding (htmlPart, simpleMail)
 
-import           Data.ByteString         (ByteString)
-import qualified Data.ByteString         as B
-import qualified Data.ByteString.Char8   as B8
-import qualified Data.ByteString.Lazy    as BL
-import qualified Data.Text               as T
-import           Data.Text.Encoding
-import qualified Data.Text.Lazy          as TL
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B8
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
+import Data.Text.Encoding
 
 data SMTPConnection = SMTPC !Handle ![ByteString]
 
