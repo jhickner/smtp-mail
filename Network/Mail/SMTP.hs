@@ -3,39 +3,39 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Network.Mail.SMTP where
-   ( -- * Main interface
-     sendMail
-   , sendMail'
-   , sendMailWithLogin
-   , sendMailWithLogin'
-   , sendMailWithSender
-   , sendMailWithSender'
-   , simpleMail
-   , plainTextPart
-   , htmlPart
-   , filePart
+    ( -- * Main interface
+      sendMail
+    , sendMail'
+    , sendMailWithLogin
+    , sendMailWithLogin'
+    , sendMailWithSender
+    , sendMailWithSender'
+    , simpleMail
+    , plainTextPart
+    , htmlPart
+    , filePart
 
-   -- * Types
-   , module Network.Mail.SMTP.Types
-   , SMTPConnection
+    -- * Types
+    , module Network.Mail.SMTP.Types
+    , SMTPConnection
 
-     -- * Network.Mail.Mime's sendmail interface (reexports)
-   , sendmail
-   , sendmailCustom
-   , renderSendMail
-   , renderSendMailCustom
+      -- * Network.Mail.Mime's sendmail interface (reexports)
+    , sendmail
+    , sendmailCustom
+    , renderSendMail
+    , renderSendMailCustom
 
-     -- * Establishing Connection
-   , connectSMTP
-   , connectSMTP'
+      -- * Establishing Connection
+    , connectSMTP
+    , connectSMTP'
 
-     -- * Operation to a Connection
-   , sendCommand
-   , login
-   , closeSMTP
-   , renderAndSend
-   , renderAndSendFrom
-   )
+      -- * Operation to a Connection
+    , sendCommand
+    , login
+    , closeSMTP
+    , renderAndSend
+    , renderAndSendFrom
+    )
 
 import           Network.Mail.SMTP.Auth
 import           Network.Mail.SMTP.Types
