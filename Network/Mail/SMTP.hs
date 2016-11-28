@@ -33,7 +33,8 @@ module Network.Mail.SMTP
     , closeSMTP
     , renderAndSend
     , renderAndSendFrom
-    ) where
+    )
+    where
 
 import Network.Mail.SMTP.Auth
 import Network.Mail.SMTP.Types
