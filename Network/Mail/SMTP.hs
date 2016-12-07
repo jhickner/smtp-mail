@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings, RecordWildCards, ScopedTypeVariables #-}
 
 module Network.Mail.SMTP
     ( -- * Main interface
@@ -26,6 +26,7 @@ module Network.Mail.SMTP
       -- * Establishing Connection
     , connectSMTP
     , connectSMTP'
+    , connectSMTPWithHostName
 
       -- * Operation to a Connection
     , sendCommand
@@ -67,14 +68,24 @@ instance Eq SMTPConnection where
 -- | Connect to an SMTP server with the specified host and default port (25)
 connectSMTP :: HostName     -- ^ name of the server
             -> IO SMTPConnection
-connectSMTP = flip connectSMTP' 25
+connectSMTP hostname = connectSMTP' hostname 25
 
 -- | Connect to an SMTP server with the specified host and port
 connectSMTP' :: HostName     -- ^ name of the server
-                -> PortNumber -- ^ port number
-                -> IO SMTPConnection
+             -> PortNumber -- ^ port number
+             -> IO SMTPConnection
 connectSMTP' hostname port =
-    connectTo hostname (PortNumber port) >>= connectStream
+    connectTo hostname (PortNumber port) >>= connectStream getHostName
+
+
+-- | Connect to an SMTP server with the specified host and port
+connectSMTPWithHostName :: HostName     -- ^ name of the server
+                        -> PortNumber -- ^ port number
+                        -> IO String -- ^ Returns the host name to use to send from
+                        -> IO SMTPConnection
+connectSMTPWithHostName hostname port getMailHostName =
+    connectTo hostname (PortNumber port) >>= connectStream getMailHostName
+
 
 -- | Attemp to send a 'Command' to the SMTP server once
 tryOnce :: SMTPConnection -> Command -> ReplyCode -> IO ByteString
@@ -104,13 +115,13 @@ tryCommandNoFail tries st cmd expectedReply = do
       else return (code, msg)
 
 -- | Create an 'SMTPConnection' from an already connected Handle
-connectStream :: Handle -> IO SMTPConnection
-connectStream st = do
+connectStream :: IO String -> Handle -> IO SMTPConnection
+connectStream getMailHostName st = do
     (code1, _) <- parseResponse st
     unless (code1 == 220) $ do
         hClose st
         fail "cannot connect to the server"
-    senderHost <- getHostName
+    senderHost <- getMailHostName
     (code, initialMsg) <- tryCommandNoFail 3 (SMTPC st []) (EHLO $ B8.pack senderHost) 250
     if code == 250
       then return (SMTPC st (tail $ B8.lines initialMsg))
