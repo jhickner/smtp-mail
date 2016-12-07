@@ -1,4 +1,6 @@
-{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Network.Mail.SMTP
     ( -- * Main interface
@@ -26,6 +28,7 @@ module Network.Mail.SMTP
       -- * Establishing Connection
     , connectSMTP
     , connectSMTP'
+    , connectSMTPWithHostName
 
       -- * Operation to a Connection
     , sendCommand
@@ -58,7 +61,6 @@ import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import Data.Text.Encoding
-import Data.Maybe (fromMaybe)
 
 data SMTPConnection = SMTPC !Handle ![ByteString]
 
@@ -68,15 +70,24 @@ instance Eq SMTPConnection where
 -- | Connect to an SMTP server with the specified host and default port (25)
 connectSMTP :: HostName     -- ^ name of the server
             -> IO SMTPConnection
-connectSMTP hostname = connectSMTP' hostname 25 Nothing
+connectSMTP hostname = connectSMTP' hostname 25
 
 -- | Connect to an SMTP server with the specified host and port
 connectSMTP' :: HostName     -- ^ name of the server
-                -> PortNumber -- ^ port number
-                -> Maybe (IO String)
-                -> IO SMTPConnection
-connectSMTP' hostname port mHostname =
-    connectTo hostname (PortNumber port) >>= connectStream (fromMaybe getHostName mHostname)
+             -> PortNumber -- ^ port number
+             -> IO SMTPConnection
+connectSMTP' hostname port =
+    connectTo hostname (PortNumber port) >>= connectStream getHostName
+
+
+-- | Connect to an SMTP server with the specified host and port
+connectSMTPWithHostName :: HostName     -- ^ name of the server
+                        -> PortNumber -- ^ port number
+                        -> IO String -- ^ Returns the host name to use to send from
+                        -> IO SMTPConnection
+connectSMTPWithHostName hostname port getMailHostName =
+    connectTo hostname (PortNumber port) >>= connectStream getMailHostName
+
 
 -- | Attemp to send a 'Command' to the SMTP server once
 tryOnce :: SMTPConnection -> Command -> ReplyCode -> IO ByteString
@@ -235,7 +246,7 @@ sendMail host mail = do
 -- | Connect to an SMTP server, send a 'Mail', then disconnect.
 sendMail' :: HostName -> PortNumber -> Mail -> IO ()
 sendMail' host port mail = do
-  con <- connectSMTP' host port Nothing
+  con <- connectSMTP' host port
   renderAndSend con mail
   closeSMTP con
 
@@ -250,7 +261,7 @@ sendMailWithLogin host user pass mail = do
 -- | Connect to an SMTP server, login, send a 'Mail', disconnect.
 sendMailWithLogin' :: HostName -> PortNumber -> UserName -> Password -> Mail -> IO ()
 sendMailWithLogin' host port user pass mail = do
-  con <- connectSMTP' host port Nothing
+  con <- connectSMTP' host port
   _ <- sendCommand con (AUTH LOGIN user pass)
   renderAndSend con mail
   closeSMTP con
