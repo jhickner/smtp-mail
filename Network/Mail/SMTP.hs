@@ -1,10 +1,13 @@
 {-# LANGUAGE OverloadedStrings, ScopedTypeVariables, RecordWildCards #-}
+
 module Network.Mail.SMTP
     ( -- * Main interface
       sendMail
     , sendMail'
     , sendMailWithLogin
     , sendMailWithLogin'
+    , sendMailWithSender
+    , sendMailWithSender'
     , simpleMail
     , plainTextPart
     , htmlPart
@@ -29,6 +32,7 @@ module Network.Mail.SMTP
     , login
     , closeSMTP
     , renderAndSend
+    , renderAndSendFrom
     )
     where
 
@@ -197,7 +201,7 @@ sendCommand (SMTPC conn _) meth = do
 closeSMTP :: SMTPConnection -> IO ()
 closeSMTP c@(SMTPC conn _) = sendCommand c QUIT >> hClose conn
 
--- | Sends a rendered mail to the server. 
+-- | Sends a rendered mail to the server.
 sendRenderedMail :: ByteString   -- ^ sender mail
             -> [ByteString] -- ^ receivers
             -> ByteString   -- ^ data
@@ -215,7 +219,7 @@ renderAndSend ::SMTPConnection -> Mail -> IO ()
 renderAndSend conn mail@Mail{..} = do
     rendered <- lazyToStrict `fmap` renderMail' mail
     sendRenderedMail from to rendered conn
-  where enc  = encodeUtf8 . addressEmail 
+  where enc  = encodeUtf8 . addressEmail
         from = enc mailFrom
         to   = map enc mailTo
 
@@ -249,6 +253,27 @@ sendMailWithLogin' host port user pass mail = do
   renderAndSend con mail
   closeSMTP con
 
+-- | Send a 'Mail' with a given sender.
+sendMailWithSender :: ByteString -> HostName -> Mail -> IO ()
+sendMailWithSender sender host mail = do
+    con <- connectSMTP host
+    renderAndSendFrom sender con mail
+    closeSMTP con
+
+-- | Send a 'Mail' with a given sender.
+sendMailWithSender' :: ByteString -> HostName -> PortNumber -> Mail -> IO ()
+sendMailWithSender' sender host port mail = do
+    con <- connectSMTP' host port
+    renderAndSendFrom sender con mail
+    closeSMTP con
+
+renderAndSendFrom :: ByteString -> SMTPConnection -> Mail -> IO ()
+renderAndSendFrom sender conn mail@Mail{..} = do
+    rendered <- BL.toStrict `fmap` renderMail' mail
+    sendRenderedMail sender to rendered conn
+  where enc  = encodeUtf8 . addressEmail
+        to   = map enc mailTo
+
 -- | A convenience function that sends 'AUTH' 'LOGIN' to the server
 login :: SMTPConnection -> UserName -> Password -> IO (ReplyCode, ByteString)
 login con user pass = sendCommand con (AUTH LOGIN user pass)
@@ -273,21 +298,21 @@ simpleMail from to cc bcc subject parts =
 
 -- | Construct a plain text 'Part'
 plainTextPart :: TL.Text -> Part
-plainTextPart = Part "text/plain; charset=utf-8" 
+plainTextPart = Part "text/plain; charset=utf-8"
               QuotedPrintableText Nothing [] . TL.encodeUtf8
 
 -- | Construct an html 'Part'
 htmlPart :: TL.Text -> Part
-htmlPart = Part "text/html; charset=utf-8" 
+htmlPart = Part "text/html; charset=utf-8"
              QuotedPrintableText Nothing [] . TL.encodeUtf8
 
 -- | Construct a file attachment 'Part'
 filePart :: T.Text -- ^ content type
-         -> FilePath -- ^ path to file 
+         -> FilePath -- ^ path to file
          -> IO Part
 filePart ct fp = do
     content <- BL.readFile fp
-    return $ Part ct Base64 (Just $ T.pack (takeFileName fp)) [] content 
+    return $ Part ct Base64 (Just $ T.pack (takeFileName fp)) [] content
 
 lazyToStrict :: BL.ByteString -> B.ByteString
 lazyToStrict = B.concat . BL.toChunks
