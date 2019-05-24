@@ -32,10 +32,11 @@ library
                , base16-bytestring
                , base64-bytestring
                , bytestring
+               , connection
                , cryptohash
                , filepath
                , mime-mail
-               , network
+               , network == 3.0.1.1
                , network-bsd
                , text
 
