@@ -72,8 +72,8 @@ connectSMTP' :: HostName     -- ^ name of the server
              -> PortNumber -- ^ port number
              -> IO SMTPConnection
 connectSMTP' hostname port = do
-  context <- Conn.initConnectionContext
-  Conn.connectTo context connParams >>= connectStream getHostName
+    context <- Conn.initConnectionContext
+    Conn.connectTo context connParams >>= connectStream getHostName
   where
     connParams = Conn.ConnectionParams hostname port Nothing Nothing
 
@@ -84,8 +84,8 @@ connectSMTPWithHostName :: HostName     -- ^ name of the server
                         -> IO String -- ^ Returns the host name to use to send from
                         -> IO SMTPConnection
 connectSMTPWithHostName hostname port getMailHostName = do
-  context <- Conn.initConnectionContext
-  Conn.connectTo context connParams >>= connectStream getMailHostName
+    context <- Conn.initConnectionContext
+    Conn.connectTo context connParams >>= connectStream getMailHostName
   where
     connParams = Conn.ConnectionParams hostname port Nothing Nothing
 
@@ -134,11 +134,10 @@ connectStream getMailHostName st = do
 
 parseResponse :: Conn.Connection -> IO (ReplyCode, ByteString)
 parseResponse conn = do
-  (code, bdy) <- readLines
-  return (read $ B8.unpack code, B8.unlines bdy)
+    (code, bdy) <- readLines
+    return (read $ B8.unpack code, B8.unlines bdy)
   where
     readLines = do
-      -- TODO: catch exception if line limit is reached
       l <- Conn.connectionGetLine (16 * 1024) conn
       let (c, bdy) = B8.span isDigit l
       if not (B8.null bdy) && B8.head bdy == '-'
@@ -324,5 +323,8 @@ htmlPart body = Part "text/html; charset=utf-8"
 lazyToStrict :: BL.ByteString -> B.ByteString
 lazyToStrict = B.concat . BL.toChunks
 
+crlf :: B8.ByteString
+crlf = B8.pack "\r\n"
+
 bsPutCrLf :: Conn.Connection -> ByteString -> IO ()
-bsPutCrLf = Conn.connectionPut
+bsPutCrLf conn = Conn.connectionPut conn . flip B.append crlf

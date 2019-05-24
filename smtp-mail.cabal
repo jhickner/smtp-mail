@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                smtp-mail
-version:             0.1.4.7
+version:             0.2.0.0
 synopsis:            Simple email sending via SMTP
 -- description:
 homepage:            http://github.com/jhickner/smtp-mail
@@ -36,7 +36,7 @@ library
                , cryptohash
                , filepath
                , mime-mail
-               , network == 3.0.1.1
+               , network
                , network-bsd
                , text
 

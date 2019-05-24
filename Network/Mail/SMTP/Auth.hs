@@ -13,7 +13,6 @@ import qualified Data.ByteString.Base64 as B64  (encode)
 import Data.ByteString  (ByteString)
 import Data.List
 import Data.Bits
-import Data.Monoid
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as B8    (unwords)
 
