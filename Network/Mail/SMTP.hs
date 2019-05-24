@@ -137,8 +137,14 @@ parseResponse conn = do
     (code, bdy) <- readLines
     return (read $ B8.unpack code, B8.unlines bdy)
   where
+    getLines c acc = do
+      res <- Conn.connectionGetChunk c
+      if B8.null res
+         then return acc
+         else getLines c $ B8.append acc res
+
     readLines = do
-      l <- Conn.connectionGetLine (16 * 1024) conn
+      l <- getLines conn B8.empty
       let (c, bdy) = B8.span isDigit l
       if not (B8.null bdy) && B8.head bdy == '-'
          then do (c2, ls) <- readLines
