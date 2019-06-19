@@ -40,12 +40,14 @@ module Network.Mail.SMTP
 import Network.Mail.SMTP.Auth
 import Network.Mail.SMTP.Types
 
+import System.FilePath (takeFileName)
+
 import Control.Monad (unless)
 import Data.Char (isDigit)
 
 import Network.Socket
 import Network.BSD (getHostName)
-import Network.Mail.Mime hiding (htmlPart, simpleMail)
+import Network.Mail.Mime hiding (filePart, htmlPart, simpleMail)
 import qualified Network.Connection as Conn
 
 import Data.ByteString (ByteString)
@@ -137,14 +139,8 @@ parseResponse conn = do
     (code, bdy) <- readLines
     return (read $ B8.unpack code, B8.unlines bdy)
   where
-    getLines c acc = do
-      res <- Conn.connectionGetChunk c
-      if B8.null res
-         then return acc
-         else getLines c $ B8.append acc res
-
     readLines = do
-      l <- getLines conn B8.empty
+      l <- Conn.connectionGetLine 1000 conn
       let (c, bdy) = B8.span isDigit l
       if not (B8.null bdy) && B8.head bdy == '-'
          then do (c2, ls) <- readLines
@@ -320,11 +316,22 @@ simpleMail from to cc bcc subject parts =
 plainTextPart :: TL.Text -> Part
 plainTextPart body = Part "text/plain; charset=utf-8"
               QuotedPrintableText DefaultDisposition [] (PartContent $ TL.encodeUtf8 body)
+{-# DEPRECATED plainTextPart "Use plainPart from mime-mail package" #-}
 
 -- | Construct an html 'Part'
 htmlPart :: TL.Text -> Part
 htmlPart body = Part "text/html; charset=utf-8"
              QuotedPrintableText DefaultDisposition [] (PartContent $ TL.encodeUtf8 body)
+{-# DEPRECATED htmlPart "Use htmlPart from mime-mail package" #-}
+
+-- | Construct a file attachment 'Part'
+filePart :: T.Text -- ^ content type
+         -> FilePath -- ^ path to file
+         -> IO Part
+filePart ct fp = do
+    content <- BL.readFile fp
+    return $ Part ct Base64 (AttachmentDisposition $ T.pack (takeFileName fp)) [] (PartContent content)
+{-# DEPRECATED filePart "Use filePart from mime-mail package" #-}
 
 lazyToStrict :: BL.ByteString -> B.ByteString
 lazyToStrict = B.concat . BL.toChunks
