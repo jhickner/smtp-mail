@@ -237,7 +237,7 @@ renderAndSend conn mail@Mail{..} = do
     sendRenderedMail from to rendered conn
   where enc  = encodeUtf8 . addressEmail
         from = enc mailFrom
-        to   = map enc mailTo
+        to   = map enc $ mailTo ++ mailCc ++ mailBcc
 
 -- | Connect to an SMTP server, send a 'Mail', then disconnect.  Uses the default port (25).
 sendMail :: HostName -> Mail -> IO ()
@@ -288,7 +288,7 @@ renderAndSendFrom sender conn mail@Mail{..} = do
     rendered <- BL.toStrict `fmap` renderMail' mail
     sendRenderedMail sender to rendered conn
   where enc  = encodeUtf8 . addressEmail
-        to   = map enc mailTo
+        to   = map enc $ mailTo ++ mailCc ++ mailBcc
 
 -- | A convenience function that sends 'AUTH' 'LOGIN' to the server
 login :: SMTPConnection -> UserName -> Password -> IO (ReplyCode, ByteString)
