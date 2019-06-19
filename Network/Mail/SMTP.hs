@@ -40,16 +40,15 @@ module Network.Mail.SMTP
 import Network.Mail.SMTP.Auth
 import Network.Mail.SMTP.Types
 
-import System.IO
 import System.FilePath (takeFileName)
 
 import Control.Monad (unless)
-import Data.Monoid
 import Data.Char (isDigit)
 
-import Network
+import Network.Socket
 import Network.BSD (getHostName)
-import Network.Mail.Mime hiding (htmlPart, simpleMail)
+import Network.Mail.Mime hiding (filePart, htmlPart, simpleMail)
+import qualified Network.Connection as Conn
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -60,10 +59,10 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import Data.Text.Encoding
 
-data SMTPConnection = SMTPC !Handle ![ByteString]
+data SMTPConnection = SMTPC !Conn.Connection ![ByteString]
 
 instance Eq SMTPConnection where
-    (==) (SMTPC a _) (SMTPC b _) = a == b
+    (==) (SMTPC a _) (SMTPC b _) = Conn.connectionID a == Conn.connectionID b
 
 -- | Connect to an SMTP server with the specified host and default port (25)
 connectSMTP :: HostName     -- ^ name of the server
@@ -74,8 +73,11 @@ connectSMTP hostname = connectSMTP' hostname 25
 connectSMTP' :: HostName     -- ^ name of the server
              -> PortNumber -- ^ port number
              -> IO SMTPConnection
-connectSMTP' hostname port =
-    connectTo hostname (PortNumber port) >>= connectStream getHostName
+connectSMTP' hostname port = do
+    context <- Conn.initConnectionContext
+    Conn.connectTo context connParams >>= connectStream getHostName
+  where
+    connParams = Conn.ConnectionParams hostname port Nothing Nothing
 
 
 -- | Connect to an SMTP server with the specified host and port
@@ -83,8 +85,11 @@ connectSMTPWithHostName :: HostName     -- ^ name of the server
                         -> PortNumber -- ^ port number
                         -> IO String -- ^ Returns the host name to use to send from
                         -> IO SMTPConnection
-connectSMTPWithHostName hostname port getMailHostName =
-    connectTo hostname (PortNumber port) >>= connectStream getMailHostName
+connectSMTPWithHostName hostname port getMailHostName = do
+    context <- Conn.initConnectionContext
+    Conn.connectTo context connParams >>= connectStream getMailHostName
+  where
+    connParams = Conn.ConnectionParams hostname port Nothing Nothing
 
 
 -- | Attemp to send a 'Command' to the SMTP server once
@@ -115,11 +120,11 @@ tryCommandNoFail tries st cmd expectedReply = do
       else return (code, msg)
 
 -- | Create an 'SMTPConnection' from an already connected Handle
-connectStream :: IO String -> Handle -> IO SMTPConnection
+connectStream :: IO String -> Conn.Connection -> IO SMTPConnection
 connectStream getMailHostName st = do
     (code1, _) <- parseResponse st
     unless (code1 == 220) $ do
-        hClose st
+        Conn.connectionClose st
         fail "cannot connect to the server"
     senderHost <- getMailHostName
     (code, initialMsg) <- tryCommandNoFail 3 (SMTPC st []) (EHLO $ B8.pack senderHost) 250
@@ -129,18 +134,18 @@ connectStream getMailHostName st = do
         msg <- tryCommand 3 (SMTPC st []) (HELO $ B8.pack senderHost) 250
         return (SMTPC st (tail $ B8.lines msg))
 
-parseResponse :: Handle -> IO (ReplyCode, ByteString)
-parseResponse st = do
+parseResponse :: Conn.Connection -> IO (ReplyCode, ByteString)
+parseResponse conn = do
     (code, bdy) <- readLines
     return (read $ B8.unpack code, B8.unlines bdy)
   where
     readLines = do
-        l <- B8.hGetLine st
-        let (c, bdy) = B8.span isDigit l
-        if not (B8.null bdy) && B8.head bdy == '-'
-           then do (c2, ls) <- readLines
-                   return (c2, B8.tail bdy:ls)
-           else return (c, [B8.tail bdy])
+      l <- Conn.connectionGetLine 1000 conn
+      let (c, bdy) = B8.span isDigit l
+      if not (B8.null bdy) && B8.head bdy == '-'
+         then do (c2, ls) <- readLines
+                 return (c2, B8.tail bdy:ls)
+         else return (c, [B8.tail bdy])
 
 
 -- | Send a 'Command' to the SMTP server
@@ -210,7 +215,7 @@ sendCommand (SMTPC conn _) meth = do
 
 -- | Send 'QUIT' and close the connection.
 closeSMTP :: SMTPConnection -> IO ()
-closeSMTP c@(SMTPC conn _) = sendCommand c QUIT >> hClose conn
+closeSMTP c@(SMTPC conn _) = sendCommand c QUIT >> Conn.connectionClose conn
 
 -- | Sends a rendered mail to the server.
 sendRenderedMail :: ByteString   -- ^ sender mail
@@ -309,13 +314,15 @@ simpleMail from to cc bcc subject parts =
 
 -- | Construct a plain text 'Part'
 plainTextPart :: TL.Text -> Part
-plainTextPart = Part "text/plain; charset=utf-8"
-              QuotedPrintableText Nothing [] . TL.encodeUtf8
+plainTextPart body = Part "text/plain; charset=utf-8"
+              QuotedPrintableText DefaultDisposition [] (PartContent $ TL.encodeUtf8 body)
+{-# DEPRECATED plainTextPart "Use plainPart from mime-mail package" #-}
 
 -- | Construct an html 'Part'
 htmlPart :: TL.Text -> Part
-htmlPart = Part "text/html; charset=utf-8"
-             QuotedPrintableText Nothing [] . TL.encodeUtf8
+htmlPart body = Part "text/html; charset=utf-8"
+             QuotedPrintableText DefaultDisposition [] (PartContent $ TL.encodeUtf8 body)
+{-# DEPRECATED htmlPart "Use htmlPart from mime-mail package" #-}
 
 -- | Construct a file attachment 'Part'
 filePart :: T.Text -- ^ content type
@@ -323,7 +330,8 @@ filePart :: T.Text -- ^ content type
          -> IO Part
 filePart ct fp = do
     content <- BL.readFile fp
-    return $ Part ct Base64 (Just $ T.pack (takeFileName fp)) [] content
+    return $ Part ct Base64 (AttachmentDisposition $ T.pack (takeFileName fp)) [] (PartContent content)
+{-# DEPRECATED filePart "Use filePart from mime-mail package" #-}
 
 lazyToStrict :: BL.ByteString -> B.ByteString
 lazyToStrict = B.concat . BL.toChunks
@@ -331,5 +339,5 @@ lazyToStrict = B.concat . BL.toChunks
 crlf :: B8.ByteString
 crlf = B8.pack "\r\n"
 
-bsPutCrLf :: Handle -> ByteString -> IO ()
-bsPutCrLf h s = B8.hPut h s >> B8.hPut h crlf >> hFlush h
+bsPutCrLf :: Conn.Connection -> ByteString -> IO ()
+bsPutCrLf conn = Conn.connectionPut conn . flip B.append crlf
