@@ -10,7 +10,7 @@ maintainer:          parsonsmatt@gmail.com
 -- copyright:
 category:            Network
 build-type:          Simple
-cabal-version:       >=1.8
+cabal-version:       >=1.10
 
 extra-source-files:
     README.md
@@ -21,6 +21,7 @@ source-repository head
   location: git@github.com:jhickner/smtp-mail.git
 
 library
+  default-language: Haskell2010
   exposed-modules:
     Network.Mail.SMTP
     Network.Mail.SMTP.Auth
