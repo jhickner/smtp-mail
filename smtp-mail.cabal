@@ -1,5 +1,5 @@
 name:                smtp-mail
-version:             0.2.0.0
+version:             0.2.0.1
 synopsis:            Simple email sending via SMTP
 description:         This packages provides a simple interface for mail over SMTP. PLease see the README for more information.
 homepage:            http://github.com/jhickner/smtp-mail
@@ -34,11 +34,12 @@ library
                , base64-bytestring
                , bytestring
                , connection
-               , cryptohash
                , filepath
                , mime-mail
                , network
                , network-bsd
                , text
+               , cryptonite
+               , memory
 
   ghc-options: -Wall -fwarn-tabs
