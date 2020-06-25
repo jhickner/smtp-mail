@@ -6,13 +6,14 @@ module Network.Mail.SMTP.Auth (
     auth,
 ) where
 
-import Crypto.Hash.MD5 (hash)
+import Crypto.MAC.HMAC (hmac, HMAC)
+import Crypto.Hash.Algorithms (MD5)
+import Data.ByteArray (copyAndFreeze)
 import qualified Data.ByteString.Base16 as B16  (encode)
 import qualified Data.ByteString.Base64 as B64  (encode)
 
 import Data.ByteString  (ByteString)
 import Data.List
-import Data.Bits
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as B8    (unwords)
 
@@ -39,14 +40,9 @@ b64Encode :: String -> ByteString
 b64Encode = B64.encode . toAscii
 
 hmacMD5 :: ByteString -> ByteString -> ByteString
-hmacMD5 text key = hash (okey <> hash (ikey <> text))
-    where key' = if B.length key > 64
-                 then hash key <> B.replicate 48 0
-                 else key <> B.replicate (64-B.length key) 0
-          ipad = B.replicate 64 0x36
-          opad = B.replicate 64 0x5c
-          ikey = B.pack $ B.zipWith xor key' ipad
-          okey = B.pack $ B.zipWith xor key' opad
+hmacMD5 text key =
+    let mac = hmac key text :: HMAC MD5
+    in copyAndFreeze mac (const $ return ())
 
 encodePlain :: UserName -> Password -> ByteString
 encodePlain user pass = b64Encode $ intercalate "\0" [user, user, pass]

@@ -19,6 +19,10 @@ A template is provided:
   - Describe change #2
   - Indicate if changes are major, minor, or patch changes.
 ```
+- [#30](https://github.com/jhickner/smtp-mail/pull/30) @typetetris
+    - Replace `cryptohash` dependency with `cryptonite`.
+      `cryptohash` is deprecated and `cryptonite` offers HMAC MD5
+      directly.
 
 ## 0.2.0.0
 
