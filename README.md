@@ -79,3 +79,14 @@ objects manually.
 This library is based on code from HaskellNet, which appears to be no longer
 maintained. I've cleaned up the error handling, added some API functions to
 make common operations easier, and switched to ByteStrings where applicable.
+
+### Developing
+
+`nix-integration-test/integration-test.nix` contains a integration test, which
+uses nixos qemu vm tests to start a qemu vm with a postfix and use smtp-mail to
+send mails to that postfix.
+
+Install [nix](https://nixos.org) and execute `nix-build nix-integration-test/integration-test.nix`
+to execute the test. Success is signalled by a return code of `0`.
+
+Unconveniently it can't be run via github actions or travis, as it needs kvm virtualization.
