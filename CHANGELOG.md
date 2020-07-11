@@ -19,6 +19,9 @@ A template is provided:
   - Describe change #2
   - Indicate if changes are major, minor, or patch changes.
 ```
+
+## 0.3.0.0
+
 - [#32](https://github.com/jhickner/smtp-mail/pull/32) @typetetris
     - add some functions to use SMTPS, which should be preferred to
       STARTTLS for mail submissions of endusers according to RFC 8314

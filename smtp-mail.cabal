@@ -1,5 +1,5 @@
 name:                smtp-mail
-version:             0.2.0.1
+version:             0.3.0.0
 synopsis:            Simple email sending via SMTP
 description:         This packages provides a simple interface for mail over SMTP. PLease see the README for more information.
 homepage:            http://github.com/jhickner/smtp-mail
