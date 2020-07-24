@@ -8,6 +8,18 @@ module Network.Mail.SMTP
     , sendMailWithLogin'
     , sendMailWithSender
     , sendMailWithSender'
+    , sendMailTLS
+    , sendMailTLS'
+    , sendMailWithLoginTLS
+    , sendMailWithLoginTLS'
+    , sendMailWithSenderTLS
+    , sendMailWithSenderTLS'
+    , sendMailSTARTTLS
+    , sendMailSTARTTLS'
+    , sendMailWithLoginSTARTTLS
+    , sendMailWithLoginSTARTTLS'
+    , sendMailWithSenderSTARTTLS
+    , sendMailWithSenderSTARTTLS'
     , simpleMail
     , plainTextPart
     , htmlPart
@@ -25,8 +37,14 @@ module Network.Mail.SMTP
 
       -- * Establishing Connection
     , connectSMTP
+    , connectSMTPS
+    , connectSMTPSTARTTLS
     , connectSMTP'
+    , connectSMTPS'
+    , connectSMTPSTARTTLS'
     , connectSMTPWithHostName
+    , connectSMTPWithHostNameAndTlsSettings
+    , connectSMTPWithHostNameAndTlsSettingsSTARTTLS
 
       -- * Operation to a Connection
     , sendCommand
@@ -69,28 +87,73 @@ connectSMTP :: HostName     -- ^ name of the server
             -> IO SMTPConnection
 connectSMTP hostname = connectSMTP' hostname 25
 
+-- | Connect to an SMTP server with the specified host and default port (587). Uses STARTTLS
+connectSMTPSTARTTLS :: HostName     -- ^ name of the server
+            -> IO SMTPConnection
+connectSMTPSTARTTLS hostname = connectSMTPSTARTTLS' hostname 587
+
+defaultTlsSettings :: Conn.TLSSettings
+defaultTlsSettings =  Conn.TLSSettingsSimple False False False
+
+-- | Connect to an SMTP server with the specified host via SMTPS on port (465).
+-- According to RFC 8314 this should be preferred over STARTTLS if the server
+-- offers it.
+-- If you need a different port number or more sophisticated 'Conn.TLSSettings'
+-- use 'connectSMTPWithHostNameAndTlsSettings'.
+connectSMTPS :: HostName     -- ^ name of the server
+            -> IO SMTPConnection
+connectSMTPS hostname = 
+    connectSMTPS' hostname 465
+
 -- | Connect to an SMTP server with the specified host and port
 connectSMTP' :: HostName     -- ^ name of the server
              -> PortNumber -- ^ port number
              -> IO SMTPConnection
-connectSMTP' hostname port = do
-    context <- Conn.initConnectionContext
-    Conn.connectTo context connParams >>= connectStream getHostName
-  where
-    connParams = Conn.ConnectionParams hostname port Nothing Nothing
+connectSMTP' hostname port = connectSMTPWithHostName hostname port getHostName
 
+-- | Connect to an SMTP server with the specified host and port using TLS
+connectSMTPS' :: HostName     -- ^ name of the server
+             -> PortNumber -- ^ port number
+             -> IO SMTPConnection
+connectSMTPS' hostname port = connectSMTPWithHostNameAndTlsSettings hostname port getHostName (Just defaultTlsSettings)
+
+-- | Connect to an SMTP server with the specified host and port using STARTTLS
+connectSMTPSTARTTLS' :: HostName     -- ^ name of the server
+             -> PortNumber -- ^ port number
+             -> IO SMTPConnection
+connectSMTPSTARTTLS' hostname port = connectSMTPWithHostNameAndTlsSettingsSTARTTLS hostname port getHostName defaultTlsSettings
 
 -- | Connect to an SMTP server with the specified host and port
 connectSMTPWithHostName :: HostName     -- ^ name of the server
                         -> PortNumber -- ^ port number
                         -> IO String -- ^ Returns the host name to use to send from
                         -> IO SMTPConnection
-connectSMTPWithHostName hostname port getMailHostName = do
+connectSMTPWithHostName hostname port getMailHostName =
+    connectSMTPWithHostNameAndTlsSettings hostname port getMailHostName Nothing
+
+-- | Connect to an SMTP server with the specified host and port and maybe via TLS
+connectSMTPWithHostNameAndTlsSettings :: HostName     -- ^ name of the server
+                                      -> PortNumber -- ^ port number
+                                      -> IO String -- ^ Returns the host name to use to send from
+                                      -> Maybe Conn.TLSSettings -- ^ optional TLS parameters
+                                      -> IO SMTPConnection
+connectSMTPWithHostNameAndTlsSettings hostname port getMailHostName tlsSettings = do
     context <- Conn.initConnectionContext
     Conn.connectTo context connParams >>= connectStream getMailHostName
   where
-    connParams = Conn.ConnectionParams hostname port Nothing Nothing
-
+    connParams = Conn.ConnectionParams hostname port tlsSettings Nothing
+     
+-- | Connect to an SMTP server with the specified host and port using STARTTLS
+connectSMTPWithHostNameAndTlsSettingsSTARTTLS :: HostName     -- ^ name of the server
+                                              -> PortNumber -- ^ port number
+                                              -> IO String -- ^ Returns the host name to use to send from
+                                              -> Conn.TLSSettings -- ^ TLS parameters
+                                              -> IO SMTPConnection
+connectSMTPWithHostNameAndTlsSettingsSTARTTLS hostname port getMailHostName tlsSettings = do
+     context <- Conn.initConnectionContext
+     Conn.connectTo context connParams >>= connectStreamSTARTTLS getMailHostName context tlsSettings
+   where 
+     connParams = Conn.ConnectionParams hostname port Nothing Nothing
 
 -- | Attemp to send a 'Command' to the SMTP server once
 tryOnce :: SMTPConnection -> Command -> ReplyCode -> IO ByteString
@@ -133,6 +196,20 @@ connectStream getMailHostName st = do
       else do -- EHLO failed, try HELO
         msg <- tryCommand 3 (SMTPC st []) (HELO $ B8.pack senderHost) 250
         return (SMTPC st (tail $ B8.lines msg))
+
+-- | Create an 'SMTPConnection' from an already connected Handle using STARTTLS
+connectStreamSTARTTLS :: IO String -> Conn.ConnectionContext -> Conn.TLSSettings -> Conn.Connection -> IO SMTPConnection
+connectStreamSTARTTLS getMailHostName context tlsSettings st = do
+    (code1, _) <- parseResponse st
+    unless (code1 == 220) $ do
+        Conn.connectionClose st
+        fail "cannot connect to the server"
+    senderHost <- getMailHostName
+    _ <- tryCommand 3 (SMTPC st []) (EHLO $ B8.pack senderHost) 250
+    _ <- tryCommand 1 (SMTPC st []) STARTTLS 220
+    _ <- Conn.connectionSetSecure context st tlsSettings
+    msg <- tryCommand 1 (SMTPC st []) (EHLO $ B8.pack senderHost) 250
+    return (SMTPC st (tail $ B8.lines msg))
 
 parseResponse :: Conn.Connection -> IO (ReplyCode, ByteString)
 parseResponse conn = do
@@ -207,6 +284,7 @@ sendCommand (SMTPC conn _) meth = do
         NOOP         -> "NOOP"
         RSET         -> "RSET"
         QUIT         -> "QUIT"
+        STARTTLS     -> "STARTTLS"
         DATA{}       ->
             error "BUG: DATA pattern should be matched by sendCommand patterns"
         AUTH{}       ->
@@ -239,49 +317,93 @@ renderAndSend conn mail@Mail{..} = do
         from = enc mailFrom
         to   = map enc $ mailTo ++ mailCc ++ mailBcc
 
--- | Connect to an SMTP server, send a 'Mail', then disconnect.  Uses the default port (25).
-sendMail :: HostName -> Mail -> IO ()
-sendMail host mail = do
-  con <- connectSMTP host
+sendMailOnConnection :: Mail -> SMTPConnection -> IO ()
+sendMailOnConnection mail con = do
   renderAndSend con mail
   closeSMTP con
+
+-- | Connect to an SMTP server, send a 'Mail', then disconnect. Uses the default port (25).
+sendMail :: HostName -> Mail -> IO ()
+sendMail host mail = connectSMTP host >>= sendMailOnConnection mail
 
 -- | Connect to an SMTP server, send a 'Mail', then disconnect.
 sendMail' :: HostName -> PortNumber -> Mail -> IO ()
-sendMail' host port mail = do
-  con <- connectSMTP' host port
-  renderAndSend con mail
-  closeSMTP con
+sendMail' host port mail = connectSMTP' host port >>= sendMailOnConnection mail
 
--- | Connect to an SMTP server, login, send a 'Mail', disconnect.  Uses the default port (25).
+-- | Connect to an SMTP server, login, send a 'Mail', disconnect. Uses the default port (25).
 sendMailWithLogin :: HostName -> UserName -> Password -> Mail -> IO ()
-sendMailWithLogin host user pass mail = do
-  con <- connectSMTP host
-  _ <- sendCommand con (AUTH LOGIN user pass)
-  renderAndSend con mail
-  closeSMTP con
+sendMailWithLogin host user pass mail = connectSMTP host >>= sendMailWithLoginIntern user pass mail
 
 -- | Connect to an SMTP server, login, send a 'Mail', disconnect.
 sendMailWithLogin' :: HostName -> PortNumber -> UserName -> Password -> Mail -> IO ()
-sendMailWithLogin' host port user pass mail = do
-  con <- connectSMTP' host port
+sendMailWithLogin' host port user pass mail = connectSMTP' host port >>= sendMailWithLoginIntern user pass mail
+
+-- | Send a 'Mail' with a given sender.
+sendMailWithSender :: ByteString -> HostName -> Mail -> IO ()
+sendMailWithSender sender host mail = connectSMTP host >>= sendMailWithSenderIntern sender mail
+
+-- | Send a 'Mail' with a given sender.
+sendMailWithSender' :: ByteString -> HostName -> PortNumber -> Mail -> IO ()
+sendMailWithSender' sender host port mail = connectSMTP' host port >>= sendMailWithSenderIntern sender mail
+
+-- | Connect to an SMTP server, send a 'Mail', then disconnect. Uses SMTPS with the default port (465).
+sendMailTLS :: HostName -> Mail -> IO ()
+sendMailTLS host mail = connectSMTPS host >>= sendMailOnConnection mail
+
+-- | Connect to an SMTP server, send a 'Mail', then disconnect. Uses SMTPS.
+sendMailTLS' :: HostName -> PortNumber -> Mail -> IO ()
+sendMailTLS' host port mail = connectSMTPS' host port >>= sendMailOnConnection mail
+
+-- | Connect to an SMTP server, login, send a 'Mail', disconnect. Uses SMTPS with its default port (465).
+sendMailWithLoginTLS :: HostName -> UserName -> Password -> Mail -> IO ()
+sendMailWithLoginTLS host user pass mail = connectSMTPS host >>= sendMailWithLoginIntern user pass mail
+
+-- | Connect to an SMTP server, login, send a 'Mail', disconnect. Uses SMTPS.
+sendMailWithLoginTLS' :: HostName -> PortNumber -> UserName -> Password -> Mail -> IO ()
+sendMailWithLoginTLS' host port user pass mail = connectSMTPS' host port >>= sendMailWithLoginIntern user pass mail
+
+-- | Send a 'Mail' with a given sender. Uses SMTPS with its default port (465).
+sendMailWithSenderTLS :: ByteString -> HostName -> Mail -> IO ()
+sendMailWithSenderTLS sender host mail = connectSMTPS host >>= sendMailWithSenderIntern sender mail
+
+-- | Send a 'Mail' with a given sender. Uses SMTPS.
+sendMailWithSenderTLS' :: ByteString -> HostName -> PortNumber -> Mail -> IO ()
+sendMailWithSenderTLS' sender host port mail = connectSMTPS' host port >>= sendMailWithSenderIntern sender mail
+
+-- | Connect to an SMTP server, send a 'Mail', then disconnect. Uses STARTTLS with the default port (587).
+sendMailSTARTTLS :: HostName -> Mail -> IO ()
+sendMailSTARTTLS host mail = connectSMTPSTARTTLS host >>= sendMailOnConnection mail
+
+-- | Connect to an SMTP server, send a 'Mail', then disconnect. Uses STARTTLS.
+sendMailSTARTTLS' :: HostName -> PortNumber -> Mail -> IO ()
+sendMailSTARTTLS' host port mail = connectSMTPSTARTTLS' host port >>= sendMailOnConnection mail
+
+-- | Connect to an SMTP server, login, send a 'Mail', disconnect. Uses STARTTLS with the default port (587).
+sendMailWithLoginSTARTTLS :: HostName -> UserName -> Password -> Mail -> IO ()
+sendMailWithLoginSTARTTLS host user pass mail = connectSMTPSTARTTLS host >>= sendMailWithLoginIntern user pass mail
+
+-- | Connect to an SMTP server, login, send a 'Mail', disconnect. Uses STARTTLS.
+sendMailWithLoginSTARTTLS' :: HostName -> PortNumber -> UserName -> Password -> Mail -> IO ()
+sendMailWithLoginSTARTTLS' host port user pass mail = connectSMTPSTARTTLS' host port >>= sendMailWithLoginIntern user pass mail
+
+-- | Send a 'Mail' with a given sender. Uses STARTTLS with the default port (587).
+sendMailWithSenderSTARTTLS :: ByteString -> HostName -> Mail -> IO ()
+sendMailWithSenderSTARTTLS sender host mail = connectSMTPSTARTTLS host >>= sendMailWithSenderIntern sender mail
+
+-- | Send a 'Mail' with a given sender. Uses STARTTLS.
+sendMailWithSenderSTARTTLS' :: ByteString -> HostName -> PortNumber -> Mail -> IO ()
+sendMailWithSenderSTARTTLS' sender host port mail = connectSMTPSTARTTLS' host port >>= sendMailWithSenderIntern sender mail
+
+sendMailWithLoginIntern :: UserName -> Password -> Mail -> SMTPConnection -> IO ()
+sendMailWithLoginIntern user pass mail con = do
   _ <- sendCommand con (AUTH LOGIN user pass)
   renderAndSend con mail
   closeSMTP con
 
--- | Send a 'Mail' with a given sender.
-sendMailWithSender :: ByteString -> HostName -> Mail -> IO ()
-sendMailWithSender sender host mail = do
-    con <- connectSMTP host
-    renderAndSendFrom sender con mail
-    closeSMTP con
-
--- | Send a 'Mail' with a given sender.
-sendMailWithSender' :: ByteString -> HostName -> PortNumber -> Mail -> IO ()
-sendMailWithSender' sender host port mail = do
-    con <- connectSMTP' host port
-    renderAndSendFrom sender con mail
-    closeSMTP con
+sendMailWithSenderIntern :: ByteString -> Mail -> SMTPConnection -> IO ()
+sendMailWithSenderIntern sender mail con = do
+  renderAndSendFrom sender con mail
+  closeSMTP con
 
 renderAndSendFrom :: ByteString -> SMTPConnection -> Mail -> IO ()
 renderAndSendFrom sender conn mail@Mail{..} = do

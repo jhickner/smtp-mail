@@ -42,6 +42,18 @@ or, with authentication:
 main = sendMailWithLogin host user pass mail
 ```
 
+or, using STARTTLS:
+
+```haskell
+main = sendMailSTARTTLS host mail
+```
+
+or, using SMTPS:
+
+```haskell
+main = sendMailTLS host mail
+```
+
 Note: `sendMail'` and `sendMailWithLogin'` variations are also provided if you want to specify a port as well as a hostname.
 
 
@@ -62,12 +74,19 @@ For more complicated scenarios or for adding attachments or CC/BCC
 addresses you can import ```Network.Mail.Mime``` and construct ```Mail```
 objects manually.
 
-### Caveat
-
-You will encounter authentication errors if you try to connect to an SMTP server that expects SSL. If that's what you're looking to do, try [HaskellNet-SSL](http://hackage.haskell.org/package/HaskellNet-SSL).
-
 ### Thanks
 
 This library is based on code from HaskellNet, which appears to be no longer
 maintained. I've cleaned up the error handling, added some API functions to
 make common operations easier, and switched to ByteStrings where applicable.
+
+### Developing
+
+`nix-integration-test/integration-test.nix` contains a integration test, which
+uses nixos qemu vm tests to start a qemu vm with a postfix and use smtp-mail to
+send mails to that postfix.
+
+Install [nix](https://nixos.org) and execute `nix-build nix-integration-test/integration-test.nix`
+to execute the test. Success is signalled by a return code of `0`.
+
+Unconveniently it can't be run via github actions or travis, as it needs kvm virtualization.

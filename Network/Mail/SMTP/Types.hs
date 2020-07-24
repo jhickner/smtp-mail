@@ -30,6 +30,7 @@ data Command
     | NOOP
     | RSET
     | QUIT
+    | STARTTLS
     deriving (Show, Eq)
 
 type ReplyCode = Int
