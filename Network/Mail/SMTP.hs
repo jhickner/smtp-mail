@@ -416,7 +416,7 @@ renderAndSendFrom sender conn mail@Mail{..} = do
 login :: SMTPConnection -> UserName -> Password -> IO (ReplyCode, ByteString)
 login con user pass = sendCommand con (AUTH LOGIN user pass)
 
--- | A simple interface for generating a 'Mail' with a plantext body and
+-- | A simple interface for generating a 'Mail' with a plain text body and
 -- an optional HTML body.
 simpleMail :: Address   -- ^ from
            -> [Address] -- ^ to
