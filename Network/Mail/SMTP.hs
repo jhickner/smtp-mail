@@ -18,6 +18,8 @@ module Network.Mail.SMTP
     , sendMailSTARTTLS'
     , sendMailWithLoginSTARTTLS
     , sendMailWithLoginSTARTTLS'
+    , sendMailWithLoginOAuthSTARTTLS
+    , sendMailWithLoginOAuthSTARTTLS'
     , sendMailWithSenderSTARTTLS
     , sendMailWithSenderSTARTTLS'
     , simpleMail
@@ -258,6 +260,17 @@ sendCommand (SMTPC conn _) (AUTH LOGIN username password) = do
     command = "AUTH LOGIN"
     (userB64, passB64) = encodeLogin username password
 
+sendCommand (SMTPC conn _) (AUTH LOGIN_OAUTH username token) = do
+    bsPutCrLf conn command
+    _ <- parseResponse conn
+    bsPutCrLf conn tokenB64
+    (code, msg) <- parseResponse conn
+    unless (code == 235) $ fail "authentication failed."
+    return (code, msg)
+  where
+    command = "AUTH XOAUTH2"
+    tokenB64 = encodeLoginOAuth username token
+
 sendCommand (SMTPC conn _) (AUTH at username password) = do
     bsPutCrLf conn command
     (code, msg) <- parseResponse conn
@@ -362,6 +375,14 @@ sendMailWithLoginTLS host user pass mail = connectSMTPS host >>= sendMailWithLog
 sendMailWithLoginTLS' :: HostName -> PortNumber -> UserName -> Password -> Mail -> IO ()
 sendMailWithLoginTLS' host port user pass mail = connectSMTPS' host port >>= sendMailWithLoginIntern user pass mail
 
+-- | Connect to an SMTP server, login with OAuth, send a 'Mail', disconnect. Uses STARTTLS with the default port (587).
+sendMailWithLoginOAuthSTARTTLS :: HostName -> UserName -> Token -> Mail -> IO ()
+sendMailWithLoginOAuthSTARTTLS host user token mail = connectSMTPSTARTTLS host >>= sendMailWithLoginOAuthIntern user token mail
+
+-- | Connect to an SMTP server, login with OAuth, send a 'Mail', disconnect. Uses STARTTLS.
+sendMailWithLoginOAuthSTARTTLS' :: HostName -> PortNumber -> UserName -> Token -> Mail -> IO ()
+sendMailWithLoginOAuthSTARTTLS' host port user token mail = connectSMTPSTARTTLS' host port >>= sendMailWithLoginOAuthIntern user token mail
+
 -- | Send a 'Mail' with a given sender. Uses SMTPS with its default port (465).
 sendMailWithSenderTLS :: ByteString -> HostName -> Mail -> IO ()
 sendMailWithSenderTLS sender host mail = connectSMTPS host >>= sendMailWithSenderIntern sender mail
@@ -397,6 +418,12 @@ sendMailWithSenderSTARTTLS' sender host port mail = connectSMTPSTARTTLS' host po
 sendMailWithLoginIntern :: UserName -> Password -> Mail -> SMTPConnection -> IO ()
 sendMailWithLoginIntern user pass mail con = do
   _ <- sendCommand con (AUTH LOGIN user pass)
+  renderAndSend con mail
+  closeSMTP con
+
+sendMailWithLoginOAuthIntern :: UserName -> Password -> Mail -> SMTPConnection -> IO ()
+sendMailWithLoginOAuthIntern user token mail con = do
+  _ <- sendCommand con (AUTH LOGIN_OAUTH user token)
   renderAndSend con mail
   closeSMTP con
 
