@@ -20,6 +20,11 @@ A template is provided:
   - Indicate if changes are major, minor, or patch changes.
 ```
 
+## 0.3.0.1
+ - [#39](https://github.com/jhickner/smtp-mail/pull/39) @spencerjanssen
+    - The `Bcc` field is stripped from the message before sending to the SMTP
+      server. This is to prevent leaking the BCC contents to recipients.
+
 ## 0.3.0.0
 
 - [#32](https://github.com/jhickner/smtp-mail/pull/32) @typetetris

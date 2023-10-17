@@ -311,11 +311,14 @@ sendRenderedMail sender receivers dat conn = do
 -- 'SMTPConnection'
 renderAndSend ::SMTPConnection -> Mail -> IO ()
 renderAndSend conn mail@Mail{..} = do
-    rendered <- lazyToStrict `fmap` renderMail' mail
+    rendered <- lazyToStrict `fmap` renderMail' (removeBcc mail)
     sendRenderedMail from to rendered conn
   where enc  = encodeUtf8 . addressEmail
         from = enc mailFrom
         to   = map enc $ mailTo ++ mailCc ++ mailBcc
+
+removeBcc :: Mail -> Mail
+removeBcc mail = mail {mailBcc = []}
 
 sendMailOnConnection :: Mail -> SMTPConnection -> IO ()
 sendMailOnConnection mail con = do
@@ -407,7 +410,7 @@ sendMailWithSenderIntern sender mail con = do
 
 renderAndSendFrom :: ByteString -> SMTPConnection -> Mail -> IO ()
 renderAndSendFrom sender conn mail@Mail{..} = do
-    rendered <- BL.toStrict `fmap` renderMail' mail
+    rendered <- BL.toStrict `fmap` renderMail' (removeBcc mail)
     sendRenderedMail sender to rendered conn
   where enc  = encodeUtf8 . addressEmail
         to   = map enc $ mailTo ++ mailCc ++ mailBcc
