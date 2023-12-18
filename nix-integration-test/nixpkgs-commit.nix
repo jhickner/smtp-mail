@@ -1,4 +1,4 @@
 fetchTarball {
- url = "https://github.com/typetetris/nixpkgs/tarball/685d2b8895faf86998877d23a7a51317e5b31425";
- sha256 = "1yl49ldh0y5v76jx3fvqf76i21mypj869jj7ffbs8slpsbd5496k";
+ url = "https://github.com/NixOS/nixpkgs/tarball/a9bf124c46ef298113270b1f84a164865987a91c";
+ sha256 = "0wdjv548d84s74wrncqqj5pdzfq7nj8xn97l0v7r82jl6124jil2";
 }
