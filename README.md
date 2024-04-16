@@ -1,3 +1,9 @@
+Development has moved to a new repository
+=========================================
+
+Development of smtp-mail has moved to a new repository at [haskell-github-trust/smtp-mail](https://github.com/haskell-github-trust/smtp-mail).
+Please submit any issues or pull requests there.
+
 SMTP-MAIL
 =========
 
